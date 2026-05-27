@@ -1,21 +1,34 @@
 /**
  * /pages/api/dashboard.js
- *
  * Meta Ads API + GA4 Data API 통합 엔드포인트
- *
- * GET /api/dashboard?startDate=YYYY-MM-DD&endDate=YYYY-MM-DD&level=campaign|adset|ad
+ * GA4 인증: OAuth2 리프레시 토큰 방식
  *
  * 필요 환경변수:
- *   META_AD_ACCOUNT_ID        예: 123456789 (act_ 없이 숫자만)
- *   META_ACCESS_TOKEN         Meta 장기 액세스 토큰
- *   GA4_PROPERTY_ID           예: 123456789
- *   GA4_SERVICE_ACCOUNT_KEY   서비스 계정 JSON을 한 줄로 stringify한 문자열
+ *   META_AD_ACCOUNT_ID    광고 계정 ID (숫자만)
+ *   META_ACCESS_TOKEN     Meta 장기 액세스 토큰
+ *   GA4_PROPERTY_ID       GA4 속성 ID
+ *   GA4_CLIENT_ID         OAuth 클라이언트 ID
+ *   GA4_CLIENT_SECRET     OAuth 클라이언트 보안 비밀번호
+ *   GA4_REFRESH_TOKEN     OAuth 리프레시 토큰
  */
 
 import axios from 'axios';
-import { JWT } from 'google-auth-library';
 
 const META_BASE = 'https://graph.facebook.com/v20.0';
+
+// ── GA4: 리프레시 토큰으로 액세스 토큰 발급 ──────────────────────
+async function getGA4AccessToken() {
+  const { GA4_CLIENT_ID, GA4_CLIENT_SECRET, GA4_REFRESH_TOKEN } = process.env;
+
+  const { data } = await axios.post('https://oauth2.googleapis.com/token', {
+    client_id: GA4_CLIENT_ID,
+    client_secret: GA4_CLIENT_SECRET,
+    refresh_token: GA4_REFRESH_TOKEN,
+    grant_type: 'refresh_token',
+  });
+
+  return data.access_token;
+}
 
 // ── Meta: 페이지네이션 처리하며 전체 데이터 수집 ──────────────────
 async function fetchMetaPages(url, params) {
@@ -62,7 +75,7 @@ async function getMetaInsights(level, startDate, endDate) {
   });
 }
 
-// ── Meta: 소재 썸네일 URL 수집 (광고 ID → URL 맵) ─────────────────
+// ── Meta: 소재 썸네일 URL 수집 ────────────────────────────────────
 async function getMetaThumbnails() {
   const { META_AD_ACCOUNT_ID: acctId, META_ACCESS_TOKEN: token } = process.env;
 
@@ -80,30 +93,23 @@ async function getMetaThumbnails() {
   );
 }
 
-// ── GA4: 구매 매출액 (캠페인명 + 광고명 기준) ────────────────────
+// ── GA4: 구매 매출액 조회 ────────────────────────────────────────
 async function getGA4Revenue(startDate, endDate) {
-  const { GA4_PROPERTY_ID: propId, GA4_SERVICE_ACCOUNT_KEY: keyRaw } = process.env;
-
-  const svcKey = JSON.parse(keyRaw);
-  const jwtClient = new JWT({
-    email: svcKey.client_email,
-    key: svcKey.private_key,
-    scopes: ['https://www.googleapis.com/auth/analytics.readonly'],
-  });
-  const { token } = await jwtClient.getAccessToken();
+  const { GA4_PROPERTY_ID: propId } = process.env;
+  const accessToken = await getGA4AccessToken();
 
   const { data } = await axios.post(
     `https://analyticsdata.googleapis.com/v1beta/properties/${propId}:runReport`,
     {
       dateRanges: [{ startDate, endDate }],
       dimensions: [
-        { name: 'sessionCampaignName' },    // utm_campaign → 캠페인명 매칭
-        { name: 'sessionManualAdContent' }, // utm_content  → 소재명 매칭
+        { name: 'sessionCampaignName' },
+        { name: 'sessionManualAdContent' },
       ],
       metrics: [{ name: 'purchaseRevenue' }],
     },
     {
-      headers: { Authorization: `Bearer ${token}` },
+      headers: { Authorization: `Bearer ${accessToken}` },
       timeout: 30000,
     }
   );
@@ -139,31 +145,28 @@ export default async function handler(req, res) {
     !process.env.META_AD_ACCOUNT_ID && 'META_AD_ACCOUNT_ID',
     !process.env.META_ACCESS_TOKEN && 'META_ACCESS_TOKEN',
     !process.env.GA4_PROPERTY_ID && 'GA4_PROPERTY_ID',
-    !process.env.GA4_SERVICE_ACCOUNT_KEY && 'GA4_SERVICE_ACCOUNT_KEY',
+    !process.env.GA4_CLIENT_ID && 'GA4_CLIENT_ID',
+    !process.env.GA4_CLIENT_SECRET && 'GA4_CLIENT_SECRET',
+    !process.env.GA4_REFRESH_TOKEN && 'GA4_REFRESH_TOKEN',
   ].filter(Boolean);
 
   if (missing.length > 0)
     return res.status(500).json({
-      error: `환경변수 미설정: ${missing.join(', ')} — Vercel 대시보드의 Environment Variables를 확인해주세요.`,
+      error: `환경변수 미설정: ${missing.join(', ')}`,
     });
 
   try {
-    // 항상 광고(ad) 단위로 Meta 인사이트를 가져와서 GA4 매출을 정확히 매칭
     const [adInsights, ga4Data, thumbnails] = await Promise.all([
       getMetaInsights('ad', startDate, endDate),
       getGA4Revenue(startDate, endDate),
       level === 'ad' ? getMetaThumbnails() : Promise.resolve({}),
     ]);
 
-    // 광고별 GA4 매출 매칭 (캠페인명 + 소재명 이중 매칭으로 정확도 향상)
     const adWithRevenue = adInsights.map((ad) => {
       const revenue = ga4Data
-        .filter(
-          (g) => g.campaign === ad.campaign_name && g.ad === ad.ad_name
-        )
+        .filter((g) => g.campaign === ad.campaign_name && g.ad === ad.ad_name)
         .reduce((s, g) => s + g.revenue, 0);
 
-      // utm_content에 캠페인 구분 없이 소재명만 넣는 경우 폴백 매칭
       const revenueFallback =
         revenue === 0
           ? ga4Data
@@ -174,7 +177,6 @@ export default async function handler(req, res) {
       return { ...ad, revenue: revenue || revenueFallback };
     });
 
-    // ── 소재(ad) 레벨 응답 ──────────────────────────────────────
     if (level === 'ad') {
       const data = adWithRevenue.map((ad) => ({
         id: ad.ad_id,
@@ -189,16 +191,11 @@ export default async function handler(req, res) {
         clicks: parseInt(ad.inline_link_clicks) || 0,
         thumbnail: thumbnails[ad.ad_id] || null,
       }));
-
       return res.json({ data });
     }
 
-    // ── 캠페인/광고세트 레벨 응답 ────────────────────────────────
-    // 지출/도달/노출/클릭은 Meta 직접 집계값 사용 (정확도 우선)
-    // 매출은 광고 단위 GA4 매칭값 합산
     const levelInsights = await getMetaInsights(level, startDate, endDate);
 
-    // 광고세트/캠페인 ID별 매출 합산 맵 생성
     const revenueMap = {};
     adWithRevenue.forEach((ad) => {
       const key = level === 'adset' ? ad.adset_id : ad.campaign_id;
@@ -209,7 +206,6 @@ export default async function handler(req, res) {
       const id = level === 'adset' ? item.adset_id : item.campaign_id;
       const revenue = revenueMap[id] || 0;
       const spend = parseFloat(item.spend) || 0;
-
       return {
         id,
         name: level === 'adset' ? item.adset_name : item.campaign_name,
