@@ -154,8 +154,9 @@ async function getGA4RevenueSplit(startDate, endDate, ga4Token) {
   let adRevenue = 0, viralRevenue = 0;
   (data.rows || []).forEach(r => {
     const sm = r.dimensionValues[0].value.toLowerCase();
+    const medium = sm.split(' / ')[1] || '';
     const rev = parseFloat(r.metricValues[0].value) || 0;
-    if (sm.includes('cpm')) adRevenue += rev;
+    if (medium.includes('cpm')) adRevenue += rev;
     else viralRevenue += rev;
   });
   return { adRevenue, viralRevenue };
