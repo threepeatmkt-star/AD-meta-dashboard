@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import Head from 'next/head';
 
+// ── 날짜 유틸 ────────────────────────────────────────────────────
 function fmtDate(d) {
   const dt = new Date(d);
   return `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`;
@@ -29,10 +30,26 @@ function getPrevRange(s,e) {
   return [fmtDate(ps),fmtDate(pe)];
 }
 
+// ── 캠페인 정렬: 판매 > ASC > 전환 > 기타 ──────────────────────
+function campaignOrder(name) {
+  const n = (name || '').toLowerCase();
+  if (n.includes('판매')) return 1;
+  if (n.includes('asc')) return 2;
+  if (n.includes('전환')) return 3;
+  return 4;
+}
+function sortByCampaign(arr) {
+  return [...arr].sort((a, b) => {
+    const ca = campaignOrder(a.campaignName || a.name);
+    const cb = campaignOrder(b.campaignName || b.name);
+    return ca !== cb ? ca - cb : (a.name||'').localeCompare(b.name||'', 'ko');
+  });
+}
+
+// ── 포맷 ────────────────────────────────────────────────────────
 const krw = n => n?'₩'+Math.round(n).toLocaleString('ko-KR'):'₩0';
 const num = n => n?Number(n).toLocaleString('ko-KR'):'0';
 const ctr = (c,i) => i>0?(c/i*100).toFixed(2)+'%':'0%';
-
 function roasCls(r) {
   if(r>=300) return 'text-blue-600 font-bold';
   if(r>=150) return 'text-amber-500 font-semibold';
@@ -49,9 +66,7 @@ function extractProduct(name) {
 }
 function normalizeProduct(prod) {
   if(!prod) return '-';
-  // 글리펌프 + 글리아르 묶기
-  if(prod.includes('글리펌프') || prod.includes('글리아르')) return '글리펌프+글리아르';
-  // 실온닭가슴살 (파) 묶기
+  if(prod.includes('글리펌프')||prod.includes('글리아르')) return '글리펌프+글리아르';
   if(prod.includes('실온닭가슴살')) return '실온닭가슴살';
   return prod;
 }
@@ -63,7 +78,9 @@ function groupByProduct(rows) {
     map[key].spend+=r.spend;map[key].revenue+=r.revenue;map[key].reach+=r.reach;
     map[key].impressions+=r.impressions;map[key].clicks+=r.clicks;map[key].dailyBudget+=r.dailyBudget||0;map[key].count++;
   });
-  return Object.values(map).map(g=>({...g,roas:g.spend>0?Math.round(g.revenue/g.spend*1000)/10:0}));
+  return Object.values(map)
+    .map(g=>({...g,roas:g.spend>0?Math.round(g.revenue/g.spend*1000)/10:0}))
+    .sort((a,b)=>campaignOrder(a.campaignName)-campaignOrder(b.campaignName));
 }
 function sumRows(arr) {
   return arr.reduce((a,d)=>({spend:a.spend+d.spend,revenue:a.revenue+d.revenue,reach:a.reach+d.reach,impressions:a.impressions+d.impressions,clicks:a.clicks+d.clicks}),{spend:0,revenue:0,reach:0,impressions:0,clicks:0});
@@ -72,12 +89,12 @@ function Spinner({sm}) {
   return <svg className={`${sm?'w-4 h-4':'w-6 h-6'} animate-spin text-blue-500`} fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg>;
 }
 
+// ── 카드 ────────────────────────────────────────────────────────
 function Card({label,value,curr,prev,isRoas,roasVal,loading,accent,sub}) {
   return (
     <div className={`rounded-2xl border p-5 shadow-sm ${accent?'bg-blue-50 border-blue-200':'bg-white border-gray-200'}`}>
       <p className={`text-sm font-semibold mb-2 ${accent?'text-blue-500':'text-gray-400'}`}>{label}</p>
-      {loading
-        ?<div className="h-8 bg-gray-100 rounded animate-pulse w-28"/>
+      {loading?<div className="h-8 bg-gray-100 rounded animate-pulse w-28"/>
         :<>
           <div className="flex items-baseline flex-wrap gap-1">
             <span className={`text-2xl font-bold ${isRoas?roasCls(roasVal):accent?'text-blue-700':'text-gray-900'}`}>{value}</span>
@@ -89,7 +106,6 @@ function Card({label,value,curr,prev,isRoas,roasVal,loading,accent,sub}) {
     </div>
   );
 }
-
 function SectionLabel({children}) {
   return (
     <div className="flex items-center gap-3 mb-3">
@@ -99,20 +115,20 @@ function SectionLabel({children}) {
   );
 }
 
+// ── 멀티셀렉트 ──────────────────────────────────────────────────
 function MultiAdsetSelect({options,selected,onChange}) {
   const [open,setOpen]=useState(false);
   const ref=useRef(null);
   useEffect(()=>{
     const h=e=>{if(ref.current&&!ref.current.contains(e.target))setOpen(false);};
-    document.addEventListener('mousedown',h);
-    return()=>document.removeEventListener('mousedown',h);
+    document.addEventListener('mousedown',h);return()=>document.removeEventListener('mousedown',h);
   },[]);
   const toggle=v=>onChange(selected.includes(v)?selected.filter(x=>x!==v):[...selected,v]);
   const label=selected.length===0?'전체 광고세트':selected.length===1?selected[0]:`${selected.length}개 선택됨`;
   return (
     <div className="relative" ref={ref}>
       <button onClick={()=>setOpen(!open)}
-        className="flex items-center gap-2 border border-gray-200 rounded-xl px-3 py-2 text-sm text-gray-600 bg-white font-medium hover:border-blue-300 transition-colors min-w-[180px] max-w-[260px]">
+        className="flex items-center gap-2 border border-gray-200 rounded-xl px-3 py-2 text-sm text-gray-600 bg-white font-medium hover:border-blue-300 transition-colors min-w-[160px] max-w-[240px]">
         <span className="truncate flex-1 text-left">{label}</span>
         <svg className={`w-4 h-4 text-gray-400 shrink-0 transition-transform ${open?'rotate-180':''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7"/></svg>
       </button>
@@ -133,41 +149,23 @@ function MultiAdsetSelect({options,selected,onChange}) {
   );
 }
 
-// ── 규칙 기반 인사이트 패널 ────────────────────────────────────────
+// ── 인사이트 패널 ────────────────────────────────────────────────
 function InsightPanel({data,level,dateRange}) {
   const [insights,setInsights]=useState(null);
   const [loading,setLoading]=useState(false);
   const [error,setError]=useState('');
-
   const generate=async()=>{
     if(!data.length) return;
     setLoading(true);setError('');setInsights(null);
     try {
-      const r=await fetch('/api/insights',{
-        method:'POST',
-        headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({data,level,dateRange}),
-      });
+      const r=await fetch('/api/insights',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({data,level,dateRange})});
       const j=await r.json();
       if(j.error) throw new Error(j.error);
       setInsights(j.insights);
-    } catch(e){setError(e.message);}
-    finally{setLoading(false);}
+    } catch(e){setError(e.message);} finally{setLoading(false);}
   };
-
-  const typeStyle={
-    summary:'bg-blue-50 border-blue-200',
-    top:'bg-emerald-50 border-emerald-200',
-    warning:'bg-amber-50 border-amber-200',
-    action:'bg-purple-50 border-purple-200',
-  };
-  const itemStyle={
-    summary:'text-blue-800',
-    top:'text-emerald-800',
-    warning:'text-amber-800',
-    action:'text-purple-800',
-  };
-
+  const typeStyle={summary:'bg-blue-50 border-blue-200',top:'bg-emerald-50 border-emerald-200',warning:'bg-amber-50 border-amber-200',action:'bg-purple-50 border-purple-200'};
+  const itemStyle={summary:'text-blue-800',top:'text-emerald-800',warning:'text-amber-800',action:'text-purple-800'};
   return (
     <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
       <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
@@ -186,21 +184,13 @@ function InsightPanel({data,level,dateRange}) {
       </div>
       <div className="px-6 py-5 min-h-[80px]">
         {error&&<p className="text-sm text-red-500">⚠️ {error}</p>}
-        {!insights&&!loading&&!error&&(
-          <p className="text-sm text-gray-400 italic">버튼을 클릭하면 현재 데이터를 분석해 인사이트를 제공합니다. API 키 없이 완전 무료예요!</p>
-        )}
+        {!insights&&!loading&&!error&&<p className="text-sm text-gray-400 italic">버튼을 클릭하면 현재 데이터를 분석해 인사이트를 제공합니다. 완전 무료예요!</p>}
         {insights&&(
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {insights.map((block,i)=>(
               <div key={i} className={`rounded-xl border p-4 ${typeStyle[block.type]||'bg-gray-50 border-gray-200'}`}>
                 <p className="font-bold text-gray-900 mb-2 text-sm">{block.title}</p>
-                <ul className="space-y-1.5">
-                  {block.items.map((item,j)=>(
-                    <li key={j} className={`text-sm leading-relaxed ${itemStyle[block.type]||'text-gray-700'}`}>
-                      {item}
-                    </li>
-                  ))}
-                </ul>
+                <ul className="space-y-1.5">{block.items.map((item,j)=><li key={j} className={`text-sm leading-relaxed ${itemStyle[block.type]||'text-gray-700'}`}>{item}</li>)}</ul>
               </div>
             ))}
           </div>
@@ -211,11 +201,7 @@ function InsightPanel({data,level,dateRange}) {
 }
 
 function exportToCSV(data,tab,dateRange) {
-  const headers={
-    campaign:['캠페인명','광고비','매출액','ROAS(%)','도달','노출','클릭','CTR(%)'],
-    adset:['광고세트명','캠페인','일예산','광고비','매출액','ROAS(%)','도달','노출','클릭','CTR(%)'],
-    ad:['소재명','광고세트','캠페인','광고비','매출액','ROAS(%)','도달','노출','클릭','CTR(%)'],
-  };
+  const headers={campaign:['캠페인명','광고비','매출액','ROAS(%)','도달','노출','클릭','CTR(%)'],adset:['광고세트명','캠페인','일예산','광고비','매출액','ROAS(%)','도달','노출','클릭','CTR(%)'],ad:['소재명','광고세트','캠페인','광고비','매출액','ROAS(%)','도달','노출','클릭','CTR(%)']};
   const rows=data.map(d=>{
     const c=d.impressions>0?(d.clicks/d.impressions*100).toFixed(2):'0';
     if(tab==='campaign') return [d.name,d.spend,d.revenue,d.roas,d.reach,d.impressions,d.clicks,c];
@@ -225,14 +211,77 @@ function exportToCSV(data,tab,dateRange) {
   const csv=[headers[tab],...rows].map(r=>r.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n');
   const blob=new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8'});
   const url=URL.createObjectURL(blob);
-  const a=document.createElement('a');
-  a.href=url;a.download=`삼대오백_광고리포트_${dateRange.replace(/~/g,'-').replace(/\s/g,'')}_${tab}.csv`;
+  const a=document.createElement('a');a.href=url;
+  a.download=`삼대오백_광고리포트_${dateRange.replace(/~/g,'-').replace(/\s/g,'')}_${tab}.csv`;
   a.click();URL.revokeObjectURL(url);
 }
 
 const BLU='#1877F2';
 
-export default function Dashboard() {
+// ── 로그인 화면 ─────────────────────────────────────────────────
+function LoginPage({onLogin}) {
+  const [pw,setPw]=useState('');
+  const [error,setError]=useState('');
+  const [loading,setLoading]=useState(false);
+
+  const submit=async(e)=>{
+    e.preventDefault();
+    setLoading(true);setError('');
+    try {
+      const r=await fetch('/api/auth',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({password:pw})});
+      const j=await r.json();
+      if(j.ok) { sessionStorage.setItem('dash_auth','1'); onLogin(); }
+      else setError(j.error||'비밀번호가 올바르지 않습니다.');
+    } catch { setError('오류가 발생했습니다. 다시 시도해주세요.'); }
+    finally { setLoading(false); }
+  };
+
+  return (
+    <div className="min-h-screen bg-slate-50 flex items-center justify-center" style={{fontFamily:"'Pretendard','Apple SD Gothic Neo',sans-serif"}}>
+      <Head>
+        <title>로그인 — 쓰리핏 메타광고 대시보드</title>
+        <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css"/>
+      </Head>
+      <div className="bg-white rounded-3xl shadow-xl border border-gray-200 p-10 w-full max-w-sm mx-4">
+        <div className="flex flex-col items-center mb-8">
+          <div className="w-14 h-14 rounded-2xl flex items-center justify-center shadow mb-4" style={{background:`linear-gradient(135deg,${BLU},#0a5ec0)`}}>
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="white"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14H9V10h2v6zm4 0h-2v-3.5c0-.83-.67-1.5-1.5-1.5S10 11.67 10 12.5V16H8v-6h2v.93c.5-.81 1.33-1.43 2.25-1.43C13.77 9.5 15 10.73 15 12.25V16z"/></svg>
+          </div>
+          <p className="text-xl font-bold text-gray-900">쓰리핏 메타광고 대시보드</p>
+          <span className="mt-1 px-2.5 py-0.5 rounded-full text-xs font-bold text-white" style={{background:BLU}}>삼대오백</span>
+          <p className="text-sm text-gray-400 mt-3">사내용 · 로그인 후 이용 가능합니다</p>
+        </div>
+        <form onSubmit={submit} className="space-y-4">
+          <div>
+            <label className="block text-sm font-semibold text-gray-600 mb-1.5">비밀번호</label>
+            <input type="password" value={pw} onChange={e=>setPw(e.target.value)} placeholder="비밀번호 입력"
+              className="w-full border border-gray-300 rounded-xl px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-blue-300 focus:border-transparent"
+              autoFocus/>
+          </div>
+          {error&&<p className="text-sm text-red-500 font-medium">⚠️ {error}</p>}
+          <button type="submit" disabled={loading||!pw}
+            className="w-full py-3 text-white text-base font-bold rounded-xl disabled:opacity-60 transition-colors shadow-sm"
+            style={{background:BLU}}>
+            {loading?'확인 중…':'로그인'}
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+// ── 메인 대시보드 ────────────────────────────────────────────────
+export default function App() {
+  const [authed,setAuthed]=useState(null); // null=로딩중
+  useEffect(()=>{
+    setAuthed(sessionStorage.getItem('dash_auth')==='1');
+  },[]);
+  if(authed===null) return null;
+  if(!authed) return <LoginPage onLogin={()=>setAuthed(true)}/>;
+  return <Dashboard/>;
+}
+
+function Dashboard() {
   const [preset,setPreset]=useState('last7');
   const [customStart,setCustomStart]=useState('');
   const [customEnd,setCustomEnd]=useState('');
@@ -261,16 +310,15 @@ export default function Dashboard() {
       const r=await fetch(`/api/dashboard?startDate=${start}&endDate=${end}&level=${tab}`);
       const j=await r.json();
       if(j.error) throw new Error(j.error);
-      setData(j.data||[]);setAdRevenue(j.adRevenue||0);setViralRevenue(j.viralRevenue||0);
+      setData(sortByCampaign(j.data||[]));setAdRevenue(j.adRevenue||0);setViralRevenue(j.viralRevenue||0);
       if(compare){
         const [ps,pe]=getPrevRange(start,end);
         const pr=await fetch(`/api/dashboard?startDate=${ps}&endDate=${pe}&level=${tab}`);
         const pj=await pr.json();
-        setPrevData(pj.data||[]);setPrevAdRevenue(pj.adRevenue||0);setPrevViralRevenue(pj.viralRevenue||0);
+        setPrevData(sortByCampaign(pj.data||[]));setPrevAdRevenue(pj.adRevenue||0);setPrevViralRevenue(pj.viralRevenue||0);
       } else {setPrevData([]);setPrevAdRevenue(0);setPrevViralRevenue(0);}
       setLastUpdated(new Date().toLocaleTimeString('ko-KR'));
-    } catch(e){setError(e.message);}
-    finally{setLoading(false);}
+    } catch(e){setError(e.message);} finally{setLoading(false);}
   },[getRange,tab,compare]);
 
   useEffect(()=>{load();setSelectedAdsets([]);},[load]);
@@ -297,6 +345,8 @@ export default function Dashboard() {
     {v:'thisMonth',l:'이번 달'},{v:'lastMonth',l:'지난 달'},{v:'custom',l:'직접 설정'},
   ];
   const TABS=[{v:'campaign',l:'📊 캠페인'},{v:'adset',l:'🎯 광고세트'},{v:'ad',l:'🖼 소재'}];
+
+  const logout=()=>{sessionStorage.removeItem('dash_auth');window.location.reload();};
 
   return (
     <div className="min-h-screen bg-slate-50" style={{fontFamily:"'Pretendard','Apple SD Gothic Neo',sans-serif"}}>
@@ -334,6 +384,9 @@ export default function Dashboard() {
               style={{background:BLU}}>
               {loading?<Spinner/>:<span>🔄</span>}
               <span className="hidden sm:inline">새로고침</span>
+            </button>
+            <button onClick={logout} className="px-3 py-2.5 border border-gray-200 text-gray-500 rounded-xl text-sm font-semibold hover:bg-gray-50 transition-colors">
+              로그아웃
             </button>
           </div>
         </div>
@@ -376,11 +429,7 @@ export default function Dashboard() {
       </div>
 
       <main className="max-w-screen-xl mx-auto px-6 py-6 space-y-6">
-        {error&&(
-          <div className="p-5 bg-red-50 border border-red-200 rounded-2xl text-base text-red-700">
-            <strong>⚠️ 오류:</strong> {error}
-          </div>
-        )}
+        {error&&<div className="p-5 bg-red-50 border border-red-200 rounded-2xl text-base text-red-700"><strong>⚠️ 오류:</strong> {error}</div>}
 
         {/* Row 1: 광고비 / 총매출 / ROAS */}
         <div>
@@ -390,7 +439,7 @@ export default function Dashboard() {
             <Card label="총 매출 (GA4)" value={krw(totals.revenue)} curr={totals.revenue} prev={compare?prevTotals.revenue:undefined} loading={loading}/>
             <Card label="ROAS" value={`${totals.roas}%`} curr={totals.roas} prev={compare?prevTotals.roas:undefined} isRoas roasVal={totals.roas} loading={loading}/>
           </div>
-          {/* Row 2: 도달 / 노출 / 클릭수 / 클릭률 */}
+          {/* Row 2: 도달 / 노출 / 클릭 / CTR */}
           <div className="grid grid-cols-4 gap-4 mt-4">
             <Card label="도달" value={num(totals.reach)} curr={totals.reach} prev={compare?prevTotals.reach:undefined} loading={loading}/>
             <Card label="노출" value={num(totals.impressions)} curr={totals.impressions} prev={compare?prevTotals.impressions:undefined} loading={loading}/>
@@ -399,7 +448,7 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Row 3: DA광고매출 / SNS바이럴매출 */}
+        {/* Row 3: DA광고매출 / 바이럴매출 */}
         <div>
           <SectionLabel>자사몰 (GA4) 매출 개요 — SNS 채널 기준 (fb / insta / ig)</SectionLabel>
           <div className="grid grid-cols-2 gap-4">
@@ -410,6 +459,7 @@ export default function Dashboard() {
 
         {/* 테이블 */}
         <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden shadow-sm">
+          {/* 탭 행 */}
           <div className="flex items-center border-b border-gray-100 overflow-x-auto">
             {TABS.map(t=>(
               <button key={t.v} onClick={()=>{setTab(t.v);setSelectedAdsets([]);}}
@@ -417,9 +467,6 @@ export default function Dashboard() {
                 {t.l}
               </button>
             ))}
-            {tab==='ad'&&adsetOptions.length>0&&(
-              <div className="ml-3"><MultiAdsetSelect options={adsetOptions} selected={selectedAdsets} onChange={setSelectedAdsets}/></div>
-            )}
             <div className="ml-auto px-4 flex items-center gap-3">
               <button onClick={()=>exportToCSV(displayData,tab,dateRangeLabel)} disabled={!displayData.length}
                 className="flex items-center gap-1.5 px-3 py-2 border border-gray-200 text-gray-600 rounded-xl text-sm font-semibold hover:bg-gray-50 disabled:opacity-40 transition-colors">
@@ -429,6 +476,18 @@ export default function Dashboard() {
             </div>
           </div>
 
+          {/* 소재 탭 — 광고세트 필터 (별도 행으로 분리) */}
+          {tab==='ad'&&adsetOptions.length>0&&(
+            <div className="px-5 py-3 border-b border-gray-100 bg-gray-50/50 flex items-center gap-3">
+              <span className="text-sm text-gray-500 font-semibold whitespace-nowrap">광고세트 필터:</span>
+              <MultiAdsetSelect options={adsetOptions} selected={selectedAdsets} onChange={setSelectedAdsets}/>
+              {selectedAdsets.length>0&&(
+                <button onClick={()=>setSelectedAdsets('')} className="text-sm text-gray-400 hover:text-gray-600 font-medium">✕ 초기화</button>
+              )}
+            </div>
+          )}
+
+          {/* 광고세트 서브탭 */}
           {tab==='adset'&&(
             <div className="flex border-b border-gray-100 bg-gray-50/50">
               {[{v:'adset',l:'세트별'},{v:'product',l:'캠페인 · 제품별'}].map(st=>(
@@ -472,12 +531,14 @@ export default function Dashboard() {
                         {tab==='ad'&&(
                           <td className="px-5 py-3">
                             {row.thumbnail
-                              ?<img src={row.thumbnail} alt="" className="w-20 h-20 rounded-xl object-cover border border-gray-200 shadow-sm cursor-zoom-in"
-                                  onMouseEnter={e=>setHoverThumb({src:row.thumbnail,x:e.clientX,y:e.clientY})}
-                                  onMouseMove={e=>setHoverThumb(p=>p?{...p,x:e.clientX,y:e.clientY}:null)}
-                                  onMouseLeave={()=>setHoverThumb(null)}
-                                  onError={e=>{e.target.style.display='none';}}/>
-                              :<div className="w-20 h-20 rounded-xl bg-gray-100 flex items-center justify-center text-gray-300 text-2xl">🖼</div>
+                              ?<div className="w-20 h-20 rounded-xl overflow-hidden border border-gray-200 shadow-sm cursor-zoom-in bg-gray-100 flex-shrink-0">
+                                  <img src={row.thumbnail} alt="" className="w-full h-full object-cover"
+                                    onMouseEnter={e=>setHoverThumb({src:row.thumbnail,x:e.clientX,y:e.clientY})}
+                                    onMouseMove={e=>setHoverThumb(p=>p?{...p,x:e.clientX,y:e.clientY}:null)}
+                                    onMouseLeave={()=>setHoverThumb(null)}
+                                    onError={e=>{e.target.parentElement.innerHTML='<div class="w-full h-full flex items-center justify-center text-2xl text-gray-300">🖼</div>';}}/>
+                                </div>
+                              :<div className="w-20 h-20 rounded-xl bg-gray-100 flex items-center justify-center text-gray-300 text-2xl border border-gray-200">🖼</div>
                             }
                           </td>
                         )}
@@ -541,7 +602,6 @@ export default function Dashboard() {
           )}
         </div>
 
-        {/* AI 인사이트 */}
         <InsightPanel data={displayData} level={tab} dateRange={dateRangeLabel}/>
 
         <div className="flex items-center gap-5 text-sm text-gray-400 pb-3">
@@ -549,7 +609,7 @@ export default function Dashboard() {
           <span className="text-blue-600 font-bold">■ 300%↑ 우수</span>
           <span className="text-amber-500 font-semibold">■ 150~299% 보통</span>
           <span className="text-rose-500 font-semibold">■ 150%↓ 주의</span>
-          <span className="ml-auto text-gray-300 text-xs">GA4 SNS 필터: .*fb.*|.*insta.*|.*ig.*</span>
+          <span className="ml-auto text-gray-300 text-xs">GA4 SNS 필터: .*fb.*|.*insta.*|.*ig.*|.*l\.instagram.*</span>
         </div>
       </main>
     </div>
