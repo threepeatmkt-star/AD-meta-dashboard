@@ -145,7 +145,7 @@ async function getGA4RevenueSplit(startDate, endDate, ga4Token) {
       dimensionFilter: {
         filter: {
           fieldName: 'sessionSourceMedium',
-          stringFilter: { matchType: 'FULL_REGEXP', value: '.*fb.*|.*insta.*|.*ig.*' },
+          stringFilter: { matchType: 'FULL_REGEXP', value: '.*fb.*|.*insta.*|.*ig.*|.*l\.instagram.*' },
         },
       },
     },
