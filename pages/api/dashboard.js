@@ -1,6 +1,7 @@
 /**
- * pages/api/dashboard.js — v5
- * 썸네일 고화질 개선: thumbnail_url → image_url 우선 사용
+ * pages/api/dashboard.js — v6
+ * GA4 매출: .*fb.*|.*insta.*|.*ig.* 정규식 필터 적용
+ * 비디오 썸네일: video_id → 썸네일 별도 조회
  */
 import axios from 'axios';
 
@@ -43,19 +44,58 @@ async function getMetaInsights(level, startDate, endDate) {
   });
 }
 
+// 비디오 ID로 썸네일 URL 가져오기
+async function getVideoThumbnail(videoId, token) {
+  try {
+    const res = await axios.get(`${META_BASE}/${videoId}`, {
+      params: { fields: 'thumbnails', access_token: token },
+      timeout: 10000,
+    });
+    const thumbs = res.data?.thumbnails?.data;
+    if (thumbs && thumbs.length > 0) {
+      // 가장 큰 썸네일 선택
+      const best = thumbs.reduce((a, b) => ((b.width||0) > (a.width||0) ? b : a), thumbs[0]);
+      return best.uri || null;
+    }
+  } catch {}
+  return null;
+}
+
 async function getMetaThumbnails() {
   const { META_AD_ACCOUNT_ID: acctId, META_ACCESS_TOKEN: token } = process.env;
   const ads = await fetchMetaPages(`${META_BASE}/act_${acctId}/ads`, {
-    // image_url이 고화질, thumbnail_url은 저화질 — 둘 다 요청 후 우선순위 적용
-    fields: 'id,creative{image_url,thumbnail_url,object_story_spec{video_data{image_url}}}',
+    fields: 'id,creative{image_url,thumbnail_url,video_id,object_story_spec{video_data{image_url,video_id}}}',
     filtering: JSON.stringify([{ field: 'effective_status', operator: 'IN', value: ['ACTIVE'] }]),
     limit: 100, access_token: token,
   });
+
+  // 비디오 ID 모아서 병렬 조회
+  const videoFetches = [];
+  const adVideoMap = {};
+  ads.forEach(a => {
+    const c = a.creative;
+    const vid = c?.video_id || c?.object_story_spec?.video_data?.video_id;
+    if (vid && !c?.image_url) {
+      adVideoMap[a.id] = vid;
+      if (!videoFetches.find(f => f.vid === vid)) videoFetches.push({ vid, token });
+    }
+  });
+
+  // 비디오 썸네일 병렬 조회
+  const videoThumbMap = {};
+  await Promise.all(
+    [...new Set(Object.values(adVideoMap))].map(async vid => {
+      videoThumbMap[vid] = await getVideoThumbnail(vid, token);
+    })
+  );
+
   return Object.fromEntries(ads.map(a => {
     const c = a.creative;
+    const vid = adVideoMap[a.id];
     const hq =
       c?.image_url ||
       c?.object_story_spec?.video_data?.image_url ||
+      (vid ? videoThumbMap[vid] : null) ||
       c?.thumbnail_url ||
       null;
     return [a.id, hq];
@@ -92,6 +132,7 @@ async function getGA4Revenue(startDate, endDate, ga4Token) {
     }));
 }
 
+// GA4 SNS 매출 — 정규식: .*fb.*|.*insta.*|.*ig.*
 async function getGA4RevenueSplit(startDate, endDate, ga4Token) {
   const { GA4_PROPERTY_ID: propId } = process.env;
   const { data } = await axios.post(
@@ -100,6 +141,13 @@ async function getGA4RevenueSplit(startDate, endDate, ga4Token) {
       dateRanges: [{ startDate, endDate }],
       dimensions: [{ name: 'sessionSourceMedium' }],
       metrics: [{ name: 'purchaseRevenue' }],
+      // SNS 채널(FB/인스타)만 필터링
+      dimensionFilter: {
+        filter: {
+          fieldName: 'sessionSourceMedium',
+          stringFilter: { matchType: 'FULL_REGEXP', value: '.*fb.*|.*insta.*|.*ig.*' },
+        },
+      },
     },
     { headers: { Authorization: `Bearer ${ga4Token}` }, timeout: 30000 }
   );
@@ -143,8 +191,8 @@ export default async function handler(req, res) {
     ]);
 
     const adWithRevenue = adInsights.map(ad => {
-      const revenue = ga4Data.filter(g => g.campaign === ad.campaign_name && g.ad === ad.ad_name).reduce((s,g) => s+g.revenue, 0);
-      const fallback = revenue === 0 ? ga4Data.filter(g => g.ad === ad.ad_name && g.ad !== '(not set)').reduce((s,g) => s+g.revenue, 0) : 0;
+      const revenue = ga4Data.filter(g => g.campaign === ad.campaign_name && g.ad === ad.ad_name).reduce((s,g)=>s+g.revenue,0);
+      const fallback = revenue === 0 ? ga4Data.filter(g => g.ad === ad.ad_name && g.ad !== '(not set)').reduce((s,g)=>s+g.revenue,0) : 0;
       return { ...ad, revenue: revenue || fallback };
     });
 
@@ -169,22 +217,20 @@ export default async function handler(req, res) {
 
     const data = levelInsights.map(item => {
       const id = level === 'adset' ? item.adset_id : item.campaign_id;
-      const revenue = revenueMap[id]||0;
-      const spend = parseFloat(item.spend)||0;
+      const revenue = revenueMap[id]||0, spend = parseFloat(item.spend)||0;
       return {
         id, name: level==='adset' ? item.adset_name : item.campaign_name,
-        campaignName: item.campaign_name, adsetName: level==='adset' ? item.adset_name : null,
+        campaignName: item.campaign_name, adsetName: level==='adset'?item.adset_name:null,
         spend, revenue, roas: calcRoas(revenue, spend),
         reach: parseInt(item.reach)||0, impressions: parseInt(item.impressions)||0,
         clicks: parseInt(item.inline_link_clicks)||0,
-        dailyBudget: level==='adset' ? (budgets[item.adset_id]||0) : null,
+        dailyBudget: level==='adset'?(budgets[item.adset_id]||0):null,
         thumbnail: null,
       };
     });
     res.json({ data, ...revenueSplit });
   } catch (err) {
     console.error('[dashboard API error]', err?.response?.data || err.message);
-    const message = err?.response?.data?.error?.message || err?.response?.data?.error || err?.message || '오류가 발생했습니다.';
-    res.status(500).json({ error: message });
+    res.status(500).json({ error: err?.response?.data?.error?.message || err?.message || '오류 발생' });
   }
 }
