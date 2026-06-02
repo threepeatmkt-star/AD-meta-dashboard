@@ -1,7 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import Head from 'next/head';
 
-// ── 날짜 유틸 ─────────────────────────────────────────────────────
 function fmtDate(d) {
   const dt = new Date(d);
   return `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`;
@@ -30,10 +29,10 @@ function getPrevRange(s,e) {
   return [fmtDate(ps),fmtDate(pe)];
 }
 
-// ── 포맷 ──────────────────────────────────────────────────────────
 const krw = n => n?'₩'+Math.round(n).toLocaleString('ko-KR'):'₩0';
 const num = n => n?Number(n).toLocaleString('ko-KR'):'0';
 const ctr = (c,i) => i>0?(c/i*100).toFixed(2)+'%':'0%';
+
 function roasCls(r) {
   if(r>=300) return 'text-blue-600 font-bold';
   if(r>=150) return 'text-amber-500 font-semibold';
@@ -53,8 +52,8 @@ function groupByProduct(rows) {
   rows.forEach(r=>{
     const prod=extractProduct(r.name),key=`${r.campaignName}||${prod}`;
     if(!map[key]) map[key]={id:key,campaignName:r.campaignName,product:prod,spend:0,revenue:0,reach:0,impressions:0,clicks:0,dailyBudget:0,count:0};
-    map[key].spend+=r.spend; map[key].revenue+=r.revenue; map[key].reach+=r.reach;
-    map[key].impressions+=r.impressions; map[key].clicks+=r.clicks; map[key].dailyBudget+=r.dailyBudget||0; map[key].count++;
+    map[key].spend+=r.spend;map[key].revenue+=r.revenue;map[key].reach+=r.reach;
+    map[key].impressions+=r.impressions;map[key].clicks+=r.clicks;map[key].dailyBudget+=r.dailyBudget||0;map[key].count++;
   });
   return Object.values(map).map(g=>({...g,roas:g.spend>0?Math.round(g.revenue/g.spend*1000)/10:0}));
 }
@@ -65,7 +64,6 @@ function Spinner({sm}) {
   return <svg className={`${sm?'w-4 h-4':'w-6 h-6'} animate-spin text-blue-500`} fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg>;
 }
 
-// ── 카드 컴포넌트 ──────────────────────────────────────────────────
 function Card({label,value,curr,prev,isRoas,roasVal,loading,accent,sub}) {
   return (
     <div className={`rounded-2xl border p-5 shadow-sm ${accent?'bg-blue-50 border-blue-200':'bg-white border-gray-200'}`}>
@@ -84,7 +82,6 @@ function Card({label,value,curr,prev,isRoas,roasVal,loading,accent,sub}) {
   );
 }
 
-// ── 섹션 라벨 ─────────────────────────────────────────────────────
 function SectionLabel({children}) {
   return (
     <div className="flex items-center gap-3 mb-3">
@@ -94,17 +91,16 @@ function SectionLabel({children}) {
   );
 }
 
-// ── 멀티셀렉트 광고세트 드롭다운 ─────────────────────────────────
-function MultiAdsetSelect({options, selected, onChange}) {
-  const [open,setOpen] = useState(false);
-  const ref = useRef(null);
+function MultiAdsetSelect({options,selected,onChange}) {
+  const [open,setOpen]=useState(false);
+  const ref=useRef(null);
   useEffect(()=>{
-    const h = e => { if(ref.current&&!ref.current.contains(e.target)) setOpen(false); };
+    const h=e=>{if(ref.current&&!ref.current.contains(e.target))setOpen(false);};
     document.addEventListener('mousedown',h);
-    return ()=>document.removeEventListener('mousedown',h);
+    return()=>document.removeEventListener('mousedown',h);
   },[]);
-  const toggle = v => onChange(selected.includes(v)?selected.filter(x=>x!==v):[...selected,v]);
-  const label = selected.length===0?'전체 광고세트':selected.length===1?selected[0]:`${selected.length}개 선택됨`;
+  const toggle=v=>onChange(selected.includes(v)?selected.filter(x=>x!==v):[...selected,v]);
+  const label=selected.length===0?'전체 광고세트':selected.length===1?selected[0]:`${selected.length}개 선택됨`;
   return (
     <div className="relative" ref={ref}>
       <button onClick={()=>setOpen(!open)}
@@ -118,7 +114,7 @@ function MultiAdsetSelect({options, selected, onChange}) {
             <button onClick={()=>onChange([])} className="w-full text-left px-3 py-1.5 text-sm text-blue-500 font-semibold hover:bg-blue-50 rounded-lg">전체 선택 해제</button>
           </div>
           {options.map(o=>(
-            <label key={o} className="flex items-center gap-3 px-3 py-2 hover:bg-gray-50 cursor-pointer">
+            <label key={o} className="flex items-center gap-3 px-3 py-2.5 hover:bg-gray-50 cursor-pointer">
               <input type="checkbox" checked={selected.includes(o)} onChange={()=>toggle(o)} className="rounded text-blue-500"/>
               <span className="text-sm text-gray-700 truncate">{o}</span>
             </label>
@@ -129,90 +125,105 @@ function MultiAdsetSelect({options, selected, onChange}) {
   );
 }
 
-// ── 인사이트 패널 ──────────────────────────────────────────────────
-function InsightPanel({data, level, dateRange}) {
-  const [insight,setInsight] = useState('');
-  const [loading,setLoading] = useState(false);
-  const [error,setError] = useState('');
+// ── 규칙 기반 인사이트 패널 ────────────────────────────────────────
+function InsightPanel({data,level,dateRange}) {
+  const [insights,setInsights]=useState(null);
+  const [loading,setLoading]=useState(false);
+  const [error,setError]=useState('');
 
-  const generate = async () => {
+  const generate=async()=>{
     if(!data.length) return;
-    setLoading(true); setError(''); setInsight('');
+    setLoading(true);setError('');setInsights(null);
     try {
-      const r = await fetch('/api/insights', {
+      const r=await fetch('/api/insights',{
         method:'POST',
         headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({data,level,dateRange}),
+        body:JSON.stringify({data,level,dateRange}),
       });
-      const j = await r.json();
+      const j=await r.json();
       if(j.error) throw new Error(j.error);
-      setInsight(j.insight);
-    } catch(e) { setError(e.message); }
-    finally { setLoading(false); }
+      setInsights(j.insights);
+    } catch(e){setError(e.message);}
+    finally{setLoading(false);}
   };
 
-  // 마크다운 굵게 처리
-  const renderInsight = text => text
-    .split('\n')
-    .map((line,i)=>{
-      const formatted = line.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
-      return <p key={i} className={`${line.startsWith('**')?'text-base font-bold text-gray-900 mt-4 mb-1':'text-sm text-gray-700 leading-relaxed'}`} dangerouslySetInnerHTML={{__html:formatted||'&nbsp;'}}/>;
-    });
+  const typeStyle={
+    summary:'bg-blue-50 border-blue-200',
+    top:'bg-emerald-50 border-emerald-200',
+    warning:'bg-amber-50 border-amber-200',
+    action:'bg-purple-50 border-purple-200',
+  };
+  const itemStyle={
+    summary:'text-blue-800',
+    top:'text-emerald-800',
+    warning:'text-amber-800',
+    action:'text-purple-800',
+  };
 
   return (
     <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
       <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
         <div className="flex items-center gap-2">
-          <span className="text-lg">🤖</span>
+          <span className="text-xl">📈</span>
           <div>
-            <p className="font-bold text-gray-900">AI 인사이트</p>
-            <p className="text-xs text-gray-400">현재 {level==='campaign'?'캠페인':level==='adset'?'광고세트':'소재'} 데이터 기반 분석</p>
+            <p className="font-bold text-gray-900">자동 인사이트</p>
+            <p className="text-xs text-gray-400">현재 {level==='campaign'?'캠페인':level==='adset'?'광고세트':'소재'} 데이터 규칙 기반 분석 · 무료</p>
           </div>
         </div>
         <button onClick={generate} disabled={loading||!data.length}
           className="flex items-center gap-2 px-4 py-2 text-white text-sm font-bold rounded-xl disabled:opacity-60 transition-colors"
           style={{background:'#1877F2'}}>
-          {loading?<><Spinner sm/>분석 중…</>:<>✨ 인사이트 생성</>}
+          {loading?<><Spinner sm/><span>분석 중…</span></>:<>✨ 인사이트 분석</>}
         </button>
       </div>
       <div className="px-6 py-5 min-h-[80px]">
         {error&&<p className="text-sm text-red-500">⚠️ {error}</p>}
-        {!insight&&!loading&&!error&&(
-          <p className="text-sm text-gray-400 italic">위 버튼을 클릭하면 현재 데이터를 AI가 분석하여 인사이트를 제공합니다.</p>
+        {!insights&&!loading&&!error&&(
+          <p className="text-sm text-gray-400 italic">버튼을 클릭하면 현재 데이터를 분석해 인사이트를 제공합니다. API 키 없이 완전 무료예요!</p>
         )}
-        {insight&&<div className="space-y-0.5">{renderInsight(insight)}</div>}
+        {insights&&(
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {insights.map((block,i)=>(
+              <div key={i} className={`rounded-xl border p-4 ${typeStyle[block.type]||'bg-gray-50 border-gray-200'}`}>
+                <p className="font-bold text-gray-900 mb-2 text-sm">{block.title}</p>
+                <ul className="space-y-1.5">
+                  {block.items.map((item,j)=>(
+                    <li key={j} className={`text-sm leading-relaxed ${itemStyle[block.type]||'text-gray-700'}`}>
+                      {item}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
 }
 
-// ── 엑셀 내보내기 ─────────────────────────────────────────────────
-function exportToExcel(data, tab, dateRange) {
-  // CSV 방식 (xlsx 라이브러리 없이 순수 브라우저에서 동작)
-  const headers = {
-    campaign: ['캠페인명','광고비','매출액','ROAS(%)','도달','노출','클릭','CTR(%)'],
-    adset: ['광고세트명','캠페인','일예산','광고비','매출액','ROAS(%)','도달','노출','클릭','CTR(%)'],
-    ad: ['소재명','광고세트','캠페인','광고비','매출액','ROAS(%)','도달','노출','클릭','CTR(%)'],
+function exportToCSV(data,tab,dateRange) {
+  const headers={
+    campaign:['캠페인명','광고비','매출액','ROAS(%)','도달','노출','클릭','CTR(%)'],
+    adset:['광고세트명','캠페인','일예산','광고비','매출액','ROAS(%)','도달','노출','클릭','CTR(%)'],
+    ad:['소재명','광고세트','캠페인','광고비','매출액','ROAS(%)','도달','노출','클릭','CTR(%)'],
   };
-  const rows = data.map(d => {
-    const ctrVal = d.impressions>0?(d.clicks/d.impressions*100).toFixed(2):'0';
-    if(tab==='campaign') return [d.name,d.spend,d.revenue,d.roas,d.reach,d.impressions,d.clicks,ctrVal];
-    if(tab==='adset') return [d.name,d.campaignName,d.dailyBudget||0,d.spend,d.revenue,d.roas,d.reach,d.impressions,d.clicks,ctrVal];
-    return [d.name,d.adsetName||'',d.campaignName,d.spend,d.revenue,d.roas,d.reach,d.impressions,d.clicks,ctrVal];
+  const rows=data.map(d=>{
+    const c=d.impressions>0?(d.clicks/d.impressions*100).toFixed(2):'0';
+    if(tab==='campaign') return [d.name,d.spend,d.revenue,d.roas,d.reach,d.impressions,d.clicks,c];
+    if(tab==='adset') return [d.name,d.campaignName,d.dailyBudget||0,d.spend,d.revenue,d.roas,d.reach,d.impressions,d.clicks,c];
+    return [d.name,d.adsetName||'',d.campaignName,d.spend,d.revenue,d.roas,d.reach,d.impressions,d.clicks,c];
   });
-
-  const csv = [headers[tab],...rows].map(r=>r.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n');
-  const bom = '\uFEFF'; // 한글 깨짐 방지
-  const blob = new Blob([bom+csv],{type:'text/csv;charset=utf-8'});
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `삼대오백_광고리포트_${dateRange.replace(/~/g,'-').replace(/\s/g,'')}_${tab}.csv`;
-  a.click();
-  URL.revokeObjectURL(url);
+  const csv=[headers[tab],...rows].map(r=>r.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n');
+  const blob=new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url;a.download=`삼대오백_광고리포트_${dateRange.replace(/~/g,'-').replace(/\s/g,'')}_${tab}.csv`;
+  a.click();URL.revokeObjectURL(url);
 }
 
-// ── 메인 ──────────────────────────────────────────────────────────
+const BLU='#1877F2';
+
 export default function Dashboard() {
   const [preset,setPreset]=useState('last7');
   const [customStart,setCustomStart]=useState('');
@@ -263,7 +274,7 @@ export default function Dashboard() {
 
   const [rangeStart,rangeEnd]=getRange();
   const [prevStart,prevEnd]=rangeStart&&rangeEnd?getPrevRange(rangeStart,rangeEnd):['',''];
-  const dateRangeLabel = rangeStart===rangeEnd?rangeStart:`${rangeStart} ~ ${rangeEnd}`;
+  const dateRangeLabel=rangeStart===rangeEnd?rangeStart:`${rangeStart} ~ ${rangeEnd}`;
 
   const adsetOptions=tab==='ad'?[...new Set(data.map(d=>d.adsetName).filter(Boolean))].sort():[];
   const filteredAds=selectedAdsets.length>0?data.filter(d=>selectedAdsets.includes(d.adsetName)):data;
@@ -278,7 +289,6 @@ export default function Dashboard() {
     {v:'thisMonth',l:'이번 달'},{v:'lastMonth',l:'지난 달'},{v:'custom',l:'직접 설정'},
   ];
   const TABS=[{v:'campaign',l:'📊 캠페인'},{v:'adset',l:'🎯 광고세트'},{v:'ad',l:'🖼 소재'}];
-  const BLU = '#1877F2';
 
   return (
     <div className="min-h-screen bg-slate-50" style={{fontFamily:"'Pretendard','Apple SD Gothic Neo',sans-serif"}}>
@@ -364,7 +374,7 @@ export default function Dashboard() {
           </div>
         )}
 
-        {/* ── Row 1: 광고비 / 총매출 / ROAS ── */}
+        {/* Row 1: 광고비 / 총매출 / ROAS */}
         <div>
           <SectionLabel>개요</SectionLabel>
           <div className="grid grid-cols-3 gap-4">
@@ -372,16 +382,16 @@ export default function Dashboard() {
             <Card label="총 매출 (GA4)" value={krw(totals.revenue)} curr={totals.revenue} prev={compare?prevTotals.revenue:undefined} loading={loading}/>
             <Card label="ROAS" value={`${totals.roas}%`} curr={totals.roas} prev={compare?prevTotals.roas:undefined} isRoas roasVal={totals.roas} loading={loading}/>
           </div>
-          {/* ── Row 2: 도달 / 노출 / 클릭수 / 클릭률 ── */}
+          {/* Row 2: 도달 / 노출 / 클릭수 / 클릭률 */}
           <div className="grid grid-cols-4 gap-4 mt-4">
             <Card label="도달" value={num(totals.reach)} curr={totals.reach} prev={compare?prevTotals.reach:undefined} loading={loading}/>
             <Card label="노출" value={num(totals.impressions)} curr={totals.impressions} prev={compare?prevTotals.impressions:undefined} loading={loading}/>
             <Card label="클릭 수" value={num(totals.clicks)} curr={totals.clicks} prev={compare?prevTotals.clicks:undefined} loading={loading}/>
-            <Card label="클릭률 (CTR)" value={ctr(totals.clicks,totals.impressions)} curr={totals.impressions>0?totals.clicks/totals.impressions:0} prev={compare&&prevTotals.impressions>0?prevTotals.clicks/prevTotals.impressions:undefined} loading={loading} sub="클릭 ÷ 노출"/>
+            <Card label="클릭률 (CTR)" value={ctr(totals.clicks,totals.impressions)} loading={loading} sub="클릭 ÷ 노출"/>
           </div>
         </div>
 
-        {/* ── Row 3: DA광고매출 / SNS바이럴매출 ── */}
+        {/* Row 3: DA광고매출 / SNS바이럴매출 */}
         <div>
           <SectionLabel>자사몰 (GA4) 매출 개요 — SNS 채널 기준 (fb / insta / ig)</SectionLabel>
           <div className="grid grid-cols-2 gap-4">
@@ -390,7 +400,7 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* ── 테이블 ── */}
+        {/* 테이블 */}
         <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden shadow-sm">
           <div className="flex items-center border-b border-gray-100 overflow-x-auto">
             {TABS.map(t=>(
@@ -399,18 +409,13 @@ export default function Dashboard() {
                 {t.l}
               </button>
             ))}
-            {/* 멀티셀렉트 필터 */}
             {tab==='ad'&&adsetOptions.length>0&&(
-              <div className="ml-3">
-                <MultiAdsetSelect options={adsetOptions} selected={selectedAdsets} onChange={setSelectedAdsets}/>
-              </div>
+              <div className="ml-3"><MultiAdsetSelect options={adsetOptions} selected={selectedAdsets} onChange={setSelectedAdsets}/></div>
             )}
-            {/* 엑셀 내보내기 */}
             <div className="ml-auto px-4 flex items-center gap-3">
-              <button onClick={()=>exportToExcel(displayData,tab,dateRangeLabel)}
-                disabled={!displayData.length}
+              <button onClick={()=>exportToCSV(displayData,tab,dateRangeLabel)} disabled={!displayData.length}
                 className="flex items-center gap-1.5 px-3 py-2 border border-gray-200 text-gray-600 rounded-xl text-sm font-semibold hover:bg-gray-50 disabled:opacity-40 transition-colors">
-                📥 CSV 내보내기
+                📥 CSV
               </button>
               <span className="text-sm text-gray-400 font-medium whitespace-nowrap">{loading?'로딩 중…':`${displayData.length}건`}</span>
             </div>
@@ -429,7 +434,7 @@ export default function Dashboard() {
 
           {loading?(
             <div className="flex flex-col items-center justify-center h-56 gap-4">
-              <Spinner/><p className="text-base text-gray-400">Meta & GA4 데이터 불러오는 중…</p>
+              <Spinner/><p className="text-base text-gray-400">데이터 불러오는 중…</p>
             </div>
           ):(
             <div className="overflow-x-auto">
@@ -450,8 +455,7 @@ export default function Dashboard() {
                 <tbody className="divide-y divide-gray-100">
                   {displayData.length===0?(
                     <tr><td colSpan={13} className="px-5 py-20 text-center">
-                      <p className="text-4xl mb-3">📭</p>
-                      <p className="text-gray-400 text-base">데이터가 없습니다.</p>
+                      <p className="text-4xl mb-3">📭</p><p className="text-gray-400 text-base">데이터가 없습니다.</p>
                     </td></tr>
                   ):displayData.map((row,i)=>{
                     const prev=prevData.find(p=>p.id===row.id);
@@ -480,7 +484,7 @@ export default function Dashboard() {
                             <div>
                               <p className="font-semibold text-gray-900 truncate max-w-xs text-base" title={row.name}>{row.name}</p>
                               {tab==='ad'&&row.adsetName&&(
-                                <button onClick={()=>{setSelectedAdsets([row.adsetName]);}}
+                                <button onClick={()=>setSelectedAdsets([row.adsetName])}
                                   className="text-sm text-blue-400 hover:text-blue-600 hover:underline mt-0.5 text-left truncate max-w-xs block font-medium">
                                   {row.adsetName}
                                 </button>
@@ -529,15 +533,15 @@ export default function Dashboard() {
           )}
         </div>
 
-        {/* ── AI 인사이트 ── */}
+        {/* AI 인사이트 */}
         <InsightPanel data={displayData} level={tab} dateRange={dateRangeLabel}/>
 
         <div className="flex items-center gap-5 text-sm text-gray-400 pb-3">
-          <span className="font-semibold">ROAS 범례:</span>
+          <span className="font-semibold">ROAS:</span>
           <span className="text-blue-600 font-bold">■ 300%↑ 우수</span>
           <span className="text-amber-500 font-semibold">■ 150~299% 보통</span>
           <span className="text-rose-500 font-semibold">■ 150%↓ 주의</span>
-          <span className="ml-auto text-gray-300 text-xs">GA4 SNS 매출 필터: .*fb.*|.*insta.*|.*ig.* | DA=cpm포함 / 바이럴=cpm미포함</span>
+          <span className="ml-auto text-gray-300 text-xs">GA4 SNS 필터: .*fb.*|.*insta.*|.*ig.*</span>
         </div>
       </main>
     </div>
