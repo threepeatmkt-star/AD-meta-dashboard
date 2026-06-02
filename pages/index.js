@@ -47,10 +47,18 @@ function DeltaBadge({curr,prev}) {
 function extractProduct(name) {
   if(!name) return '-'; const p=name.split('_'); return p.length>=2?p[1]:p[0];
 }
+function normalizeProduct(prod) {
+  if(!prod) return '-';
+  // 글리펌프 + 글리아르 묶기
+  if(prod.includes('글리펌프') || prod.includes('글리아르')) return '글리펌프+글리아르';
+  // 실온닭가슴살 (파) 묶기
+  if(prod.includes('실온닭가슴살')) return '실온닭가슴살';
+  return prod;
+}
 function groupByProduct(rows) {
   const map={};
   rows.forEach(r=>{
-    const prod=extractProduct(r.name),key=`${r.campaignName}||${prod}`;
+    const prod=normalizeProduct(extractProduct(r.name)),key=`${r.campaignName}||${prod}`;
     if(!map[key]) map[key]={id:key,campaignName:r.campaignName,product:prod,spend:0,revenue:0,reach:0,impressions:0,clicks:0,dailyBudget:0,count:0};
     map[key].spend+=r.spend;map[key].revenue+=r.revenue;map[key].reach+=r.reach;
     map[key].impressions+=r.impressions;map[key].clicks+=r.clicks;map[key].dailyBudget+=r.dailyBudget||0;map[key].count++;
