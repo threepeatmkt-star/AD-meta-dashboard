@@ -220,6 +220,7 @@ const BLU='#1877F2';
 
 // ── 로그인 화면 ─────────────────────────────────────────────────
 function LoginPage({onLogin}) {
+  const [id,setId]=useState('');
   const [pw,setPw]=useState('');
   const [error,setError]=useState('');
   const [loading,setLoading]=useState(false);
@@ -228,10 +229,10 @@ function LoginPage({onLogin}) {
     e.preventDefault();
     setLoading(true);setError('');
     try {
-      const r=await fetch('/api/auth',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({password:pw})});
+      const r=await fetch('/api/auth',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id,password:pw})});
       const j=await r.json();
       if(j.ok) { sessionStorage.setItem('dash_auth','1'); onLogin(); }
-      else setError(j.error||'비밀번호가 올바르지 않습니다.');
+      else setError(j.error||'ID 또는 비밀번호가 올바르지 않습니다.');
     } catch { setError('오류가 발생했습니다. 다시 시도해주세요.'); }
     finally { setLoading(false); }
   };
@@ -253,13 +254,19 @@ function LoginPage({onLogin}) {
         </div>
         <form onSubmit={submit} className="space-y-4">
           <div>
+            <label className="block text-sm font-semibold text-gray-600 mb-1.5">아이디</label>
+            <input type="text" value={id} onChange={e=>setId(e.target.value)} placeholder="아이디 입력"
+              className="w-full border border-gray-300 rounded-xl px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-blue-300 focus:border-transparent"
+              autoFocus autoComplete="username"/>
+          </div>
+          <div>
             <label className="block text-sm font-semibold text-gray-600 mb-1.5">비밀번호</label>
             <input type="password" value={pw} onChange={e=>setPw(e.target.value)} placeholder="비밀번호 입력"
               className="w-full border border-gray-300 rounded-xl px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-blue-300 focus:border-transparent"
-              autoFocus/>
+              autoComplete="current-password"/>
           </div>
           {error&&<p className="text-sm text-red-500 font-medium">⚠️ {error}</p>}
-          <button type="submit" disabled={loading||!pw}
+          <button type="submit" disabled={loading||!id||!pw}
             className="w-full py-3 text-white text-base font-bold rounded-xl disabled:opacity-60 transition-colors shadow-sm"
             style={{background:BLU}}>
             {loading?'확인 중…':'로그인'}
