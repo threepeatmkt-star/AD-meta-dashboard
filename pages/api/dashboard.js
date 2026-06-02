@@ -1,28 +1,20 @@
 /**
- * pages/api/dashboard.js — v3
- * Meta Ads + GA4 통합 | OAuth2 리프레시 토큰 방식
- *
- * 환경변수: META_AD_ACCOUNT_ID, META_ACCESS_TOKEN,
- *           GA4_PROPERTY_ID, GA4_CLIENT_ID, GA4_CLIENT_SECRET, GA4_REFRESH_TOKEN
+ * pages/api/dashboard.js — v5
+ * 썸네일 고화질 개선: thumbnail_url → image_url 우선 사용
  */
-
 import axios from 'axios';
 
 const META_BASE = 'https://graph.facebook.com/v20.0';
 
-// ── GA4 액세스 토큰 ──────────────────────────────────────────────
 async function getGA4AccessToken() {
   const { GA4_CLIENT_ID, GA4_CLIENT_SECRET, GA4_REFRESH_TOKEN } = process.env;
   const { data } = await axios.post('https://oauth2.googleapis.com/token', {
-    client_id: GA4_CLIENT_ID,
-    client_secret: GA4_CLIENT_SECRET,
-    refresh_token: GA4_REFRESH_TOKEN,
-    grant_type: 'refresh_token',
+    client_id: GA4_CLIENT_ID, client_secret: GA4_CLIENT_SECRET,
+    refresh_token: GA4_REFRESH_TOKEN, grant_type: 'refresh_token',
   });
   return data.access_token;
 }
 
-// ── Meta 페이지네이션 ────────────────────────────────────────────
 async function fetchMetaPages(url, params) {
   const all = [];
   let res = await axios.get(url, { params, timeout: 30000 });
@@ -34,16 +26,15 @@ async function fetchMetaPages(url, params) {
   return all;
 }
 
-// ── Meta 인사이트 ────────────────────────────────────────────────
 async function getMetaInsights(level, startDate, endDate) {
   const { META_AD_ACCOUNT_ID: acctId, META_ACCESS_TOKEN: token } = process.env;
   const fields = [
-    'campaign_id', 'campaign_name',
-    ...(level !== 'campaign' ? ['adset_id', 'adset_name'] : []),
-    ...(level === 'ad' ? ['ad_id', 'ad_name'] : []),
-    'spend', 'reach', 'impressions', 'inline_link_clicks',
+    'campaign_id','campaign_name',
+    ...(level !== 'campaign' ? ['adset_id','adset_name'] : []),
+    ...(level === 'ad' ? ['ad_id','ad_name'] : []),
+    'spend','reach','impressions','inline_link_clicks',
   ].join(',');
-  const statusField = { campaign: 'campaign.effective_status', adset: 'adset.effective_status', ad: 'ad.effective_status' }[level];
+  const statusField = { campaign:'campaign.effective_status', adset:'adset.effective_status', ad:'ad.effective_status' }[level];
   return fetchMetaPages(`${META_BASE}/act_${acctId}/insights`, {
     level, fields,
     time_range: JSON.stringify({ since: startDate, until: endDate }),
@@ -52,18 +43,25 @@ async function getMetaInsights(level, startDate, endDate) {
   });
 }
 
-// ── Meta 썸네일 ──────────────────────────────────────────────────
 async function getMetaThumbnails() {
   const { META_AD_ACCOUNT_ID: acctId, META_ACCESS_TOKEN: token } = process.env;
   const ads = await fetchMetaPages(`${META_BASE}/act_${acctId}/ads`, {
-    fields: 'id,creative{thumbnail_url}',
+    // image_url이 고화질, thumbnail_url은 저화질 — 둘 다 요청 후 우선순위 적용
+    fields: 'id,creative{image_url,thumbnail_url,object_story_spec{video_data{image_url}}}',
     filtering: JSON.stringify([{ field: 'effective_status', operator: 'IN', value: ['ACTIVE'] }]),
     limit: 100, access_token: token,
   });
-  return Object.fromEntries(ads.map(a => [a.id, a.creative?.thumbnail_url || null]));
+  return Object.fromEntries(ads.map(a => {
+    const c = a.creative;
+    const hq =
+      c?.image_url ||
+      c?.object_story_spec?.video_data?.image_url ||
+      c?.thumbnail_url ||
+      null;
+    return [a.id, hq];
+  }));
 }
 
-// ── Meta 광고세트 일예산 ─────────────────────────────────────────
 async function getAdsetBudgets() {
   const { META_AD_ACCOUNT_ID: acctId, META_ACCESS_TOKEN: token } = process.env;
   const adsets = await fetchMetaPages(`${META_BASE}/act_${acctId}/adsets`, {
@@ -71,11 +69,9 @@ async function getAdsetBudgets() {
     filtering: JSON.stringify([{ field: 'effective_status', operator: 'IN', value: ['ACTIVE'] }]),
     limit: 100, access_token: token,
   });
-  // KRW 계정: daily_budget은 원화 그대로 (소수점 없음)
   return Object.fromEntries(adsets.map(a => [a.id, parseInt(a.daily_budget) || 0]));
 }
 
-// ── GA4 캠페인/소재별 매출 ───────────────────────────────────────
 async function getGA4Revenue(startDate, endDate, ga4Token) {
   const { GA4_PROPERTY_ID: propId } = process.env;
   const { data } = await axios.post(
@@ -96,7 +92,6 @@ async function getGA4Revenue(startDate, endDate, ga4Token) {
     }));
 }
 
-// ── GA4 광고매출 vs 바이럴매출 ──────────────────────────────────
 async function getGA4RevenueSplit(startDate, endDate, ga4Token) {
   const { GA4_PROPERTY_ID: propId } = process.env;
   const { data } = await axios.post(
@@ -122,7 +117,6 @@ function calcRoas(revenue, spend) {
   return spend > 0 ? Math.round((revenue / spend) * 100 * 10) / 10 : 0;
 }
 
-// ── 핸들러 ───────────────────────────────────────────────────────
 export default async function handler(req, res) {
   if (req.method !== 'GET') return res.status(405).end();
   const { startDate, endDate, level = 'campaign' } = req.query;
@@ -140,7 +134,6 @@ export default async function handler(req, res) {
 
   try {
     const ga4Token = await getGA4AccessToken();
-
     const [adInsights, ga4Data, revenueSplit, thumbnails, budgets] = await Promise.all([
       getMetaInsights('ad', startDate, endDate),
       getGA4Revenue(startDate, endDate, ga4Token),
@@ -150,12 +143,8 @@ export default async function handler(req, res) {
     ]);
 
     const adWithRevenue = adInsights.map(ad => {
-      const revenue = ga4Data
-        .filter(g => g.campaign === ad.campaign_name && g.ad === ad.ad_name)
-        .reduce((s, g) => s + g.revenue, 0);
-      const fallback = revenue === 0
-        ? ga4Data.filter(g => g.ad === ad.ad_name && g.ad !== '(not set)').reduce((s, g) => s + g.revenue, 0)
-        : 0;
+      const revenue = ga4Data.filter(g => g.campaign === ad.campaign_name && g.ad === ad.ad_name).reduce((s,g) => s+g.revenue, 0);
+      const fallback = revenue === 0 ? ga4Data.filter(g => g.ad === ad.ad_name && g.ad !== '(not set)').reduce((s,g) => s+g.revenue, 0) : 0;
       return { ...ad, revenue: revenue || fallback };
     });
 
@@ -163,10 +152,10 @@ export default async function handler(req, res) {
       const data = adWithRevenue.map(ad => ({
         id: ad.ad_id, name: ad.ad_name,
         campaignName: ad.campaign_name, adsetName: ad.adset_name, adsetId: ad.adset_id,
-        spend: parseFloat(ad.spend) || 0, revenue: ad.revenue,
-        roas: calcRoas(ad.revenue, parseFloat(ad.spend) || 0),
-        reach: parseInt(ad.reach) || 0, impressions: parseInt(ad.impressions) || 0,
-        clicks: parseInt(ad.inline_link_clicks) || 0, thumbnail: thumbnails[ad.ad_id] || null,
+        spend: parseFloat(ad.spend)||0, revenue: ad.revenue,
+        roas: calcRoas(ad.revenue, parseFloat(ad.spend)||0),
+        reach: parseInt(ad.reach)||0, impressions: parseInt(ad.impressions)||0,
+        clicks: parseInt(ad.inline_link_clicks)||0, thumbnail: thumbnails[ad.ad_id]||null,
       }));
       return res.json({ data, ...revenueSplit });
     }
@@ -175,24 +164,23 @@ export default async function handler(req, res) {
     const revenueMap = {};
     adWithRevenue.forEach(ad => {
       const key = level === 'adset' ? ad.adset_id : ad.campaign_id;
-      revenueMap[key] = (revenueMap[key] || 0) + ad.revenue;
+      revenueMap[key] = (revenueMap[key]||0) + ad.revenue;
     });
 
     const data = levelInsights.map(item => {
       const id = level === 'adset' ? item.adset_id : item.campaign_id;
-      const revenue = revenueMap[id] || 0;
-      const spend = parseFloat(item.spend) || 0;
+      const revenue = revenueMap[id]||0;
+      const spend = parseFloat(item.spend)||0;
       return {
-        id, name: level === 'adset' ? item.adset_name : item.campaign_name,
-        campaignName: item.campaign_name, adsetName: level === 'adset' ? item.adset_name : null,
+        id, name: level==='adset' ? item.adset_name : item.campaign_name,
+        campaignName: item.campaign_name, adsetName: level==='adset' ? item.adset_name : null,
         spend, revenue, roas: calcRoas(revenue, spend),
-        reach: parseInt(item.reach) || 0, impressions: parseInt(item.impressions) || 0,
-        clicks: parseInt(item.inline_link_clicks) || 0,
-        dailyBudget: level === 'adset' ? (budgets[item.adset_id] || 0) : null,
+        reach: parseInt(item.reach)||0, impressions: parseInt(item.impressions)||0,
+        clicks: parseInt(item.inline_link_clicks)||0,
+        dailyBudget: level==='adset' ? (budgets[item.adset_id]||0) : null,
         thumbnail: null,
       };
     });
-
     res.json({ data, ...revenueSplit });
   } catch (err) {
     console.error('[dashboard API error]', err?.response?.data || err.message);
