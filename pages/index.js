@@ -62,10 +62,21 @@ function roasCls(r) {
   if(r>0) return 'text-rose-500 font-semibold';
   return 'text-gray-400';
 }
-function DeltaBadge({curr,prev}) {
+function DeltaBadge({curr,prev,type='pct'}) {
   if(prev==null||prev===0) return null;
-  const p=((curr-prev)/prev)*100,up=p>=0;
-  return <span className={`text-sm ml-1 ${up?'text-emerald-600':'text-rose-500'}`}>{up?'▲':'▼'}{Math.abs(p).toFixed(1)}%</span>;
+  const diff=curr-prev, up=diff>=0;
+  const color=up?'text-emerald-600':'text-rose-500';
+  const arrow=up?'▲':'▼';
+  if(type==='currency') {
+    const abs=Math.abs(diff);
+    const fmt=abs>=10000000?`₩${(abs/10000000).toFixed(1)}천만`:abs>=1000000?`₩${(abs/1000000).toFixed(1)}백만`:abs>=10000?`₩${(abs/10000).toFixed(0)}만`:`₩${Math.round(abs).toLocaleString('ko-KR')}`;
+    return <span className={`text-sm ml-1 ${color}`}>{arrow}{fmt}</span>;
+  }
+  if(type==='number') {
+    return <span className={`text-sm ml-1 ${color}`}>{arrow}{Math.abs(diff).toLocaleString('ko-KR')}</span>;
+  }
+  const p=((curr-prev)/prev)*100;
+  return <span className={`text-sm ml-1 ${color}`}>{arrow}{Math.abs(p).toFixed(1)}%</span>;
 }
 function extractProduct(name) {
   if(!name) return '-'; const p=name.split('_'); return p.length>=2?p[1]:p[0];
@@ -96,7 +107,7 @@ function Spinner({sm}) {
 }
 
 // ── 카드 ────────────────────────────────────────────────────────
-function Card({label,value,curr,prev,isRoas,roasVal,loading,accent,sub}) {
+function Card({label,value,curr,prev,isRoas,roasVal,loading,accent,sub,deltaType='pct'}) {
   return (
     <div className={`rounded-2xl border p-5 shadow-sm ${accent?'bg-blue-50 border-blue-200':'bg-white border-gray-200'}`}>
       <p className={`text-sm font-semibold mb-2 ${accent?'text-blue-500':'text-gray-400'}`}>{label}</p>
@@ -104,7 +115,7 @@ function Card({label,value,curr,prev,isRoas,roasVal,loading,accent,sub}) {
         :<>
           <div className="flex items-baseline flex-wrap gap-1">
             <span className={`text-2xl font-bold ${isRoas?roasCls(roasVal):accent?'text-blue-700':'text-gray-900'}`}>{value}</span>
-            {prev!==undefined&&<DeltaBadge curr={curr} prev={prev}/>}
+            {prev!==undefined&&<DeltaBadge curr={curr} prev={prev} type={deltaType}/>}
           </div>
           {sub&&<p className="text-xs text-gray-400 mt-1">{sub}</p>}
         </>
@@ -252,7 +263,7 @@ function LoginPage({onLogin}) {
       <div className="bg-white rounded-3xl shadow-xl border border-gray-200 p-10 w-full max-w-sm mx-4">
         <div className="flex flex-col items-center mb-8">
           <div className="w-14 h-14 rounded-2xl shadow-md mb-4 bg-white border border-gray-100 flex items-center justify-center">
-              <img src="/logo.png" alt="Meta" className="w-10 h-10 object-contain" style={{filter:'invert(1) hue-rotate(180deg)'}}/>
+              <img src="/logo.png" alt="Meta" className="w-10 h-10 object-contain"/>
             </div>
           <p className="text-xl font-bold text-gray-900">쓰리핏 메타광고 대시보드</p>
           <span className="mt-1 px-2.5 py-0.5 rounded-full text-xs font-bold text-white" style={{background:BLU}}>삼대오백</span>
@@ -383,7 +394,7 @@ function Dashboard() {
             <button onClick={()=>{setPreset('today');setSelectedAdsets([]);}}
               className="flex items-center gap-4 hover:opacity-80 transition-opacity">
               <div className="w-12 h-12 rounded-xl shadow-md bg-white border border-gray-100 flex items-center justify-center overflow-hidden">
-                <img src="/logo.png" alt="Meta" className="w-8 h-8 object-contain" style={{filter:'invert(1) hue-rotate(180deg)'}}/>
+                <img src="/logo.png" alt="Meta" className="w-8 h-8 object-contain"/>
               </div>
               <div className="text-left">
                 <div className="flex items-center gap-2">
@@ -452,16 +463,16 @@ function Dashboard() {
         <div>
           <SectionLabel>개요</SectionLabel>
           <div className="grid grid-cols-3 gap-4">
-            <Card label="광고비 (Meta)" value={krw(totals.spend)} curr={totals.spend} prev={compare?prevTotals.spend:undefined} loading={loading}/>
-            <Card label="총 매출 (GA4·SNS)" value={krw(adRevenue+viralRevenue)} curr={adRevenue+viralRevenue} prev={compare?prevAdRevenue+prevViralRevenue:undefined} loading={loading}/>
-            <Card label="ROAS" value={`${totals.roas}%`} curr={totals.roas} prev={compare?prevTotals.roas:undefined} isRoas roasVal={totals.roas} loading={loading}/>
+            <Card label="광고비 (Meta)" value={krw(totals.spend)} curr={totals.spend} prev={compare?prevTotals.spend:undefined} loading={loading} deltaType="currency"/>
+            <Card label="총 매출 (GA4·SNS)" value={krw(adRevenue+viralRevenue)} curr={adRevenue+viralRevenue} prev={compare?prevAdRevenue+prevViralRevenue:undefined} loading={loading} deltaType="currency"/>
+            <Card label="ROAS" value={`${totals.roas}%`} curr={totals.roas} prev={compare?prevTotals.roas:undefined} isRoas roasVal={totals.roas} loading={loading} deltaType="pct"/>
           </div>
           {/* Row 2: 도달 / 노출 / 클릭 / CTR */}
           <div className="grid grid-cols-4 gap-4 mt-4">
-            <Card label="도달" value={num(totals.reach)} curr={totals.reach} prev={compare?prevTotals.reach:undefined} loading={loading}/>
-            <Card label="노출" value={num(totals.impressions)} curr={totals.impressions} prev={compare?prevTotals.impressions:undefined} loading={loading}/>
-            <Card label="클릭 수" value={num(totals.clicks)} curr={totals.clicks} prev={compare?prevTotals.clicks:undefined} loading={loading}/>
-            <Card label="클릭률 (CTR)" value={ctr(totals.clicks,totals.impressions)} loading={loading} sub="클릭 ÷ 노출"/>
+            <Card label="도달" value={num(totals.reach)} curr={totals.reach} prev={compare?prevTotals.reach:undefined} loading={loading} deltaType="number"/>
+            <Card label="노출" value={num(totals.impressions)} curr={totals.impressions} prev={compare?prevTotals.impressions:undefined} loading={loading} deltaType="number"/>
+            <Card label="클릭 수" value={num(totals.clicks)} curr={totals.clicks} prev={compare?prevTotals.clicks:undefined} loading={loading} deltaType="number"/>
+            <Card label="클릭률 (CTR)" value={ctr(totals.clicks,totals.impressions)} loading={loading} sub="클릭 ÷ 노출" deltaType="pct"/>
           </div>
         </div>
 
@@ -471,11 +482,11 @@ function Dashboard() {
           <div className="grid grid-cols-2 gap-4">
             <div onClick={() => router.push(`/da-revenue?start=${rangeStart}&end=${rangeEnd}`)}
               className="cursor-pointer hover:shadow-md transition-shadow">
-              <Card label="📣 DA 광고 매출  →" value={krw(adRevenue)} curr={adRevenue} prev={compare?prevAdRevenue:undefined} loading={loading} accent sub="클릭하면 상세 보기"/>
+              <Card label="📣 DA 광고 매출  →" value={krw(adRevenue)} curr={adRevenue} prev={compare?prevAdRevenue:undefined} loading={loading} accent sub="클릭하면 상세 보기" deltaType="currency"/>
             </div>
             <div onClick={() => router.push(`/viral-revenue?start=${rangeStart}&end=${rangeEnd}`)}
               className="cursor-pointer hover:shadow-md transition-shadow">
-              <Card label="📱 SNS 바이럴 매출  →" value={krw(viralRevenue)} curr={viralRevenue} prev={compare?prevViralRevenue:undefined} loading={loading} accent sub="클릭하면 상세 보기"/>
+              <Card label="📱 SNS 바이럴 매출  →" value={krw(viralRevenue)} curr={viralRevenue} prev={compare?prevViralRevenue:undefined} loading={loading} accent sub="클릭하면 상세 보기" deltaType="currency"/>
             </div>
           </div>
         </div>
@@ -592,9 +603,9 @@ function Dashboard() {
                             {row.dailyBudget>0?<span className="text-gray-700 font-semibold">{krw(row.dailyBudget)}</span>:<span className="text-sm text-gray-300">CBO</span>}
                           </td>
                         )}
-                        <td className="px-5 py-4 text-right whitespace-nowrap"><span className="text-gray-700 font-semibold">{krw(row.spend)}</span>{compare&&prev&&<DeltaBadge curr={row.spend} prev={prev.spend}/>}</td>
-                        <td className="px-5 py-4 text-right whitespace-nowrap"><span className={row.revenue>0?'text-gray-700 font-semibold':'text-gray-300'}>{krw(row.revenue)}</span>{compare&&prev&&<DeltaBadge curr={row.revenue} prev={prev.revenue}/>}</td>
-                        <td className="px-5 py-4 text-right whitespace-nowrap"><span className={roasCls(row.roas)}>{row.roas}%</span>{compare&&prev&&<DeltaBadge curr={row.roas} prev={prev.roas}/>}</td>
+                        <td className="px-5 py-4 text-right whitespace-nowrap"><span className="text-gray-700 font-semibold">{krw(row.spend)}</span>{compare&&prev&&<DeltaBadge curr={row.spend} prev={prev.spend} type="currency"/>}</td>
+                        <td className="px-5 py-4 text-right whitespace-nowrap"><span className={row.revenue>0?'text-gray-700 font-semibold':'text-gray-300'}>{krw(row.revenue)}</span>{compare&&prev&&<DeltaBadge curr={row.revenue} prev={prev.revenue} type="currency"/>}</td>
+                        <td className="px-5 py-4 text-right whitespace-nowrap"><span className={roasCls(row.roas)}>{row.roas}%</span>{compare&&prev&&<DeltaBadge curr={row.roas} prev={prev.roas} type="pct"/>}</td>
                         <td className="px-5 py-4 text-right text-gray-600 font-medium whitespace-nowrap">{num(row.reach)}</td>
                         <td className="px-5 py-4 text-right text-gray-600 font-medium whitespace-nowrap">{num(row.impressions)}</td>
                         <td className="px-5 py-4 text-right text-gray-600 font-medium whitespace-nowrap">{num(row.clicks)}</td>
