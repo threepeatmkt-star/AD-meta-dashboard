@@ -251,8 +251,8 @@ function LoginPage({onLogin}) {
       </Head>
       <div className="bg-white rounded-3xl shadow-xl border border-gray-200 p-10 w-full max-w-sm mx-4">
         <div className="flex flex-col items-center mb-8">
-          <div className="w-14 h-14 rounded-2xl overflow-hidden shadow mb-4 bg-black flex items-center justify-center">
-              <img src="/logo.png" alt="삼대오백" className="w-full h-full object-contain p-1.5"/>
+          <div className="w-14 h-14 rounded-2xl overflow-hidden shadow-md mb-4 bg-white border border-gray-100 flex items-center justify-center">
+              <img src="/logo.png" alt="삼대오백" className="w-full h-full object-contain p-1.5" style={{filter:'invert(1)'}}/>
             </div>
           <p className="text-xl font-bold text-gray-900">쓰리핏 메타광고 대시보드</p>
           <span className="mt-1 px-2.5 py-0.5 rounded-full text-xs font-bold text-white" style={{background:BLU}}>삼대오백</span>
@@ -382,8 +382,8 @@ function Dashboard() {
           <div className="flex items-center gap-4">
             <button onClick={()=>{setPreset('today');setSelectedAdsets([]);}}
               className="flex items-center gap-4 hover:opacity-80 transition-opacity">
-              <div className="w-12 h-12 rounded-xl overflow-hidden shadow bg-black flex items-center justify-center">
-                <img src="/logo.png" alt="삼대오백" className="w-full h-full object-contain p-1"/>
+              <div className="w-12 h-12 rounded-xl overflow-hidden shadow-md bg-white flex items-center justify-center border border-gray-100">
+                <img src="/logo.png" alt="삼대오백" className="w-full h-full object-contain p-1" style={{filter:'invert(1)'}}/>
               </div>
               <div className="text-left">
                 <div className="flex items-center gap-2">
