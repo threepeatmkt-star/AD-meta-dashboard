@@ -251,9 +251,9 @@ function LoginPage({onLogin}) {
       </Head>
       <div className="bg-white rounded-3xl shadow-xl border border-gray-200 p-10 w-full max-w-sm mx-4">
         <div className="flex flex-col items-center mb-8">
-          <div className="w-14 h-14 rounded-2xl flex items-center justify-center shadow mb-4" style={{background:`linear-gradient(135deg,${BLU},#0a5ec0)`}}>
-            <svg width="28" height="28" viewBox="0 0 24 24" fill="white"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14H9V10h2v6zm4 0h-2v-3.5c0-.83-.67-1.5-1.5-1.5S10 11.67 10 12.5V16H8v-6h2v.93c.5-.81 1.33-1.43 2.25-1.43C13.77 9.5 15 10.73 15 12.25V16z"/></svg>
-          </div>
+          <div className="w-14 h-14 rounded-2xl overflow-hidden shadow mb-4 bg-black flex items-center justify-center">
+              <img src="/logo.png" alt="삼대오백" className="w-full h-full object-contain p-1.5"/>
+            </div>
           <p className="text-xl font-bold text-gray-900">쓰리핏 메타광고 대시보드</p>
           <span className="mt-1 px-2.5 py-0.5 rounded-full text-xs font-bold text-white" style={{background:BLU}}>삼대오백</span>
           <p className="text-sm text-gray-400 mt-3">사내용 · 로그인 후 이용 가능합니다</p>
@@ -296,7 +296,7 @@ export default function App() {
 
 function Dashboard() {
   const router = useRouter();
-  const [preset,setPreset]=useState('last7');
+  const [preset,setPreset]=useState('today');
   const [customStart,setCustomStart]=useState('');
   const [customEnd,setCustomEnd]=useState('');
   const [compare,setCompare]=useState(false);
@@ -380,16 +380,19 @@ function Dashboard() {
       <header className="bg-white border-b border-gray-200 sticky top-0 z-20 shadow-sm">
         <div className="max-w-screen-xl mx-auto px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-xl flex items-center justify-center shadow" style={{background:`linear-gradient(135deg,${BLU},#0a5ec0)`}}>
-              <svg width="26" height="26" viewBox="0 0 24 24" fill="white"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14H9V10h2v6zm4 0h-2v-3.5c0-.83-.67-1.5-1.5-1.5S10 11.67 10 12.5V16H8v-6h2v.93c.5-.81 1.33-1.43 2.25-1.43C13.77 9.5 15 10.73 15 12.25V16z"/></svg>
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <p className="text-lg font-bold text-gray-900">쓰리핏 메타광고 대시보드</p>
-                <span className="px-2.5 py-0.5 rounded-full text-xs font-bold text-white" style={{background:BLU}}>삼대오백</span>
+            <button onClick={()=>{setPreset('today');setSelectedAdsets([]);}}
+              className="flex items-center gap-4 hover:opacity-80 transition-opacity">
+              <div className="w-12 h-12 rounded-xl overflow-hidden shadow bg-black flex items-center justify-center">
+                <img src="/logo.png" alt="삼대오백" className="w-full h-full object-contain p-1"/>
               </div>
-              <p className="text-sm text-gray-400">Meta Ads × GA4 통합 효율 분석 (사내용)</p>
-            </div>
+              <div className="text-left">
+                <div className="flex items-center gap-2">
+                  <p className="text-lg font-bold text-gray-900">쓰리핏 메타광고 대시보드</p>
+                  <span className="px-2.5 py-0.5 rounded-full text-xs font-bold text-white" style={{background:BLU}}>삼대오백</span>
+                </div>
+                <p className="text-sm text-gray-400">Meta Ads × GA4 통합 효율 분석 (사내용)</p>
+              </div>
+            </button>
           </div>
           <div className="flex items-center gap-3">
             {lastUpdated&&<span className="text-sm text-gray-400 hidden sm:inline">업데이트: {lastUpdated}</span>}
