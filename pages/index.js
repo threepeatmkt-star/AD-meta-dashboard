@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { useRouter } from 'next/router';
 import Head from 'next/head';
 
 // ── 날짜 유틸 ────────────────────────────────────────────────────
@@ -289,6 +290,7 @@ export default function App() {
 }
 
 function Dashboard() {
+  const router = useRouter();
   const [preset,setPreset]=useState('last7');
   const [customStart,setCustomStart]=useState('');
   const [customEnd,setCustomEnd]=useState('');
@@ -459,8 +461,14 @@ function Dashboard() {
         <div>
           <SectionLabel>자사몰 (GA4) 매출 개요 — SNS 채널 기준 (fb / insta / ig)</SectionLabel>
           <div className="grid grid-cols-2 gap-4">
-            <Card label="📣 DA 광고 매출" value={krw(adRevenue)} curr={adRevenue} prev={compare?prevAdRevenue:undefined} loading={loading} accent/>
-            <Card label="📱 SNS 바이럴 매출" value={krw(viralRevenue)} curr={viralRevenue} prev={compare?prevViralRevenue:undefined} loading={loading} accent sub="cpm 미포함 기준"/>
+            <div onClick={() => router.push(`/da-revenue?start=${rangeStart}&end=${rangeEnd}`)}
+              className="cursor-pointer hover:shadow-md transition-shadow">
+              <Card label="📣 DA 광고 매출  →" value={krw(adRevenue)} curr={adRevenue} prev={compare?prevAdRevenue:undefined} loading={loading} accent/>
+            </div>
+            <div onClick={() => router.push(`/viral-revenue?start=${rangeStart}&end=${rangeEnd}`)}
+              className="cursor-pointer hover:shadow-md transition-shadow">
+              <Card label="📱 SNS 바이럴 매출  →" value={krw(viralRevenue)} curr={viralRevenue} prev={compare?prevViralRevenue:undefined} loading={loading} accent sub="클릭하면 상세 보기"/>
+            </div>
           </div>
         </div>
 
