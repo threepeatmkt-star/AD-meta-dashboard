@@ -340,7 +340,7 @@ function Dashboard() {
   const totals={...sumRows(data)};
   totals.roas=totals.spend>0?Math.round((adRevenue+viralRevenue)/totals.spend*1000)/10:0;
   const prevTotals={...sumRows(prevData)};
-  prevTotals.roas=prevTotals.spend>0?Math.round(prevTotals.revenue/prevTotals.spend*1000)/10:0;
+  prevTotals.roas=prevTotals.spend>0?Math.round((prevAdRevenue+prevViralRevenue)/prevTotals.spend*1000)/10:0;
 
   const [rangeStart,rangeEnd]=getRange();
   const [prevStart,prevEnd]=rangeStart&&rangeEnd?getPrevRange(rangeStart,rangeEnd):['',''];
