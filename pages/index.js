@@ -17,6 +17,11 @@ function getPresetRange(preset) {
     case 'yesterday': return [fmtDate(yest),fmtDate(yest)];
     case 'thisWeek': return [fmtDate(thisMon),fmtDate(now)];
     case 'lastWeek': return [fmtDate(lastMon),fmtDate(lastSun)];
+    case 'lastLastWeek': {
+      const llSun = new Date(lastMon - 86400000);
+      const llMon = new Date(llSun - 6 * 86400000);
+      return [fmtDate(llMon), fmtDate(llSun)];
+    }
     case 'last7': return [fmtDate(new Date(now-7*86400000)),fmtDate(yest)];
     case 'last14': return [fmtDate(new Date(now-14*86400000)),fmtDate(yest)];
     case 'last30': return [fmtDate(new Date(now-30*86400000)),fmtDate(yest)];
@@ -333,7 +338,7 @@ function Dashboard() {
   useEffect(()=>{load();setSelectedAdsets([]);},[load]);
 
   const totals={...sumRows(data)};
-  totals.roas=totals.spend>0?Math.round(totals.revenue/totals.spend*1000)/10:0;
+  totals.roas=totals.spend>0?Math.round((adRevenue+viralRevenue)/totals.spend*1000)/10:0;
   const prevTotals={...sumRows(prevData)};
   prevTotals.roas=prevTotals.spend>0?Math.round(prevTotals.revenue/prevTotals.spend*1000)/10:0;
 
@@ -349,7 +354,7 @@ function Dashboard() {
   dispTotals.roas=dispTotals.spend>0?Math.round(dispTotals.revenue/dispTotals.spend*1000)/10:0;
 
   const PRESETS=[
-    {v:'today',l:'오늘'},{v:'yesterday',l:'어제'},{v:'thisWeek',l:'이번 주'},{v:'lastWeek',l:'지난 주'},
+    {v:'today',l:'오늘'},{v:'yesterday',l:'어제'},{v:'thisWeek',l:'이번 주'},{v:'lastWeek',l:'지난 주'},{v:'lastLastWeek',l:'지지난 주'},
     {v:'last7',l:'최근 7일'},{v:'last14',l:'최근 14일'},{v:'last30',l:'최근 30일'},
     {v:'thisMonth',l:'이번 달'},{v:'lastMonth',l:'지난 달'},{v:'custom',l:'직접 설정'},
   ];
@@ -445,7 +450,7 @@ function Dashboard() {
           <SectionLabel>개요</SectionLabel>
           <div className="grid grid-cols-3 gap-4">
             <Card label="광고비 (Meta)" value={krw(totals.spend)} curr={totals.spend} prev={compare?prevTotals.spend:undefined} loading={loading}/>
-            <Card label="총 매출 (GA4)" value={krw(totals.revenue)} curr={totals.revenue} prev={compare?prevTotals.revenue:undefined} loading={loading}/>
+            <Card label="총 매출 (GA4·SNS)" value={krw(adRevenue+viralRevenue)} curr={adRevenue+viralRevenue} prev={compare?prevAdRevenue+prevViralRevenue:undefined} loading={loading}/>
             <Card label="ROAS" value={`${totals.roas}%`} curr={totals.roas} prev={compare?prevTotals.roas:undefined} isRoas roasVal={totals.roas} loading={loading}/>
           </div>
           {/* Row 2: 도달 / 노출 / 클릭 / CTR */}
@@ -463,7 +468,7 @@ function Dashboard() {
           <div className="grid grid-cols-2 gap-4">
             <div onClick={() => router.push(`/da-revenue?start=${rangeStart}&end=${rangeEnd}`)}
               className="cursor-pointer hover:shadow-md transition-shadow">
-              <Card label="📣 DA 광고 매출  →" value={krw(adRevenue)} curr={adRevenue} prev={compare?prevAdRevenue:undefined} loading={loading} accent/>
+              <Card label="📣 DA 광고 매출  →" value={krw(adRevenue)} curr={adRevenue} prev={compare?prevAdRevenue:undefined} loading={loading} accent sub="클릭하면 상세 보기"/>
             </div>
             <div onClick={() => router.push(`/viral-revenue?start=${rangeStart}&end=${rangeEnd}`)}
               className="cursor-pointer hover:shadow-md transition-shadow">
