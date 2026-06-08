@@ -252,9 +252,7 @@ function LoginPage({onLogin}) {
       <div className="bg-white rounded-3xl shadow-xl border border-gray-200 p-10 w-full max-w-sm mx-4">
         <div className="flex flex-col items-center mb-8">
           <div className="w-14 h-14 rounded-2xl shadow-md mb-4 bg-white border border-gray-100 flex items-center justify-center">
-              <svg width="32" height="16" viewBox="0 0 56 28" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M8 14C8 7 14 2 20 6C23 8 24.5 11 28 11C31.5 11 33 8 36 6C42 2 48 7 48 14C48 21 42 26 36 22C33 20 31.5 17 28 17C24.5 17 23 20 20 22C14 26 8 21 8 14Z" fill={BLU}/>
-              </svg>
+              <img src="/logo.png" alt="Meta" className="w-10 h-10 object-contain" style={{filter:'invert(1) hue-rotate(180deg)'}}/>
             </div>
           <p className="text-xl font-bold text-gray-900">쓰리핏 메타광고 대시보드</p>
           <span className="mt-1 px-2.5 py-0.5 rounded-full text-xs font-bold text-white" style={{background:BLU}}>삼대오백</span>
@@ -384,10 +382,8 @@ function Dashboard() {
           <div className="flex items-center gap-4">
             <button onClick={()=>{setPreset('today');setSelectedAdsets([]);}}
               className="flex items-center gap-4 hover:opacity-80 transition-opacity">
-              <div className="w-12 h-12 rounded-xl shadow-md bg-white border border-gray-100 flex items-center justify-center">
-                <svg width="28" height="14" viewBox="0 0 56 28" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M8 14C8 7 14 2 20 6C23 8 24.5 11 28 11C31.5 11 33 8 36 6C42 2 48 7 48 14C48 21 42 26 36 22C33 20 31.5 17 28 17C24.5 17 23 20 20 22C14 26 8 21 8 14Z" fill={BLU}/>
-                </svg>
+              <div className="w-12 h-12 rounded-xl shadow-md bg-white border border-gray-100 flex items-center justify-center overflow-hidden">
+                <img src="/logo.png" alt="Meta" className="w-8 h-8 object-contain" style={{filter:'invert(1) hue-rotate(180deg)'}}/>
               </div>
               <div className="text-left">
                 <div className="flex items-center gap-2">
