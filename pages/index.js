@@ -529,22 +529,21 @@ function Dashboard() {
             <Card label="클릭 수" value={num(totals.clicks)} curr={totals.clicks} prev={compare?prevTotals.clicks:undefined} loading={loading} deltaType="number"/>
             <Card label="클릭률 (CTR)" value={ctr(totals.clicks,totals.impressions)} loading={loading} sub="클릭 ÷ 노출" deltaType="pct"/>
           </div>
-        </div>
 
-        {/* Row 3: DA광고매출 / 바이럴매출 */}
-        <div className="mt-4">
-          <SectionLabel>자사몰 (GA4) 매출 개요 — SNS 채널 기준 (fb / insta / ig)</SectionLabel>
-          <div className="grid grid-cols-2 gap-4">
-            <div onClick={() => router.push(`/da-revenue?start=${rangeStart}&end=${rangeEnd}`)}
-              className="cursor-pointer hover:shadow-md transition-shadow">
-              <Card label="📣 DA 광고 매출  →" value={krw(adRevenue)} curr={adRevenue} prev={compare?prevAdRevenue:undefined} loading={loading} accent sub="클릭하면 상세 보기" deltaType="currency"/>
-            </div>
-            <div onClick={() => router.push(`/viral-revenue?start=${rangeStart}&end=${rangeEnd}`)}
-              className="cursor-pointer hover:shadow-md transition-shadow">
-              <Card label="📱 SNS 바이럴 매출  →" value={krw(viralRevenue)} curr={viralRevenue} prev={compare?prevViralRevenue:undefined} loading={loading} accent sub="클릭하면 상세 보기" deltaType="currency"/>
+          {/* Row 3: DA광고매출 / 바이럴매출 */}
+          <div className="mt-4">
+            <SectionLabel>자사몰 (GA4) 매출 개요 — SNS 채널 기준 (fb / insta / ig)</SectionLabel>
+            <div className="grid grid-cols-2 gap-4">
+              <div onClick={() => router.push(`/da-revenue?start=${rangeStart}&end=${rangeEnd}`)}
+                className="cursor-pointer hover:shadow-md transition-shadow">
+                <Card label="📣 DA 광고 매출  →" value={krw(adRevenue)} curr={adRevenue} prev={compare?prevAdRevenue:undefined} loading={loading} accent sub="클릭하면 상세 보기" deltaType="currency"/>
+              </div>
+              <div onClick={() => router.push(`/viral-revenue?start=${rangeStart}&end=${rangeEnd}`)}
+                className="cursor-pointer hover:shadow-md transition-shadow">
+                <Card label="📱 SNS 바이럴 매출  →" value={krw(viralRevenue)} curr={viralRevenue} prev={compare?prevViralRevenue:undefined} loading={loading} accent sub="클릭하면 상세 보기" deltaType="currency"/>
+              </div>
             </div>
           </div>
-        </div>
         </div>{/* end overviewRef */}
 
         {/* 테이블 */}
