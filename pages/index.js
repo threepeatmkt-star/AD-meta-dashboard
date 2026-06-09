@@ -307,6 +307,35 @@ export default function App() {
 
 function Dashboard() {
   const router = useRouter();
+  const overviewRef = useRef(null);
+  const [copying, setCopying] = useState(false);
+
+  const copyToClipboard = async () => {
+    if (!overviewRef.current) return;
+    setCopying(true);
+    try {
+      const html2canvas = (await import('html2canvas')).default;
+      const canvas = await html2canvas(overviewRef.current, {
+        backgroundColor: '#f8fafc',
+        scale: 2,
+        useCORS: true,
+        logging: false,
+      });
+      canvas.toBlob(async (blob) => {
+        try {
+          await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+          alert('📋 클립보드에 복사됐어요! 슬랙/카톡에 붙여넣기 하세요.');
+        } catch {
+          // 클립보드 API 안 되는 경우 다운로드로 대체
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url; a.download = `대시보드_개요_${new Date().toLocaleDateString('ko-KR').replace(/\. /g,'-').replace('.','')}png`;
+          a.click(); URL.revokeObjectURL(url);
+        }
+      }, 'image/png');
+    } catch(e) { alert('캡처 실패: ' + e.message); }
+    finally { setCopying(false); }
+  };
   const [preset,setPreset]=useState('today');
   const [customStart,setCustomStart]=useState('');
   const [customEnd,setCustomEnd]=useState('');
@@ -460,8 +489,24 @@ function Dashboard() {
         {error&&<div className="p-5 bg-red-50 border border-red-200 rounded-2xl text-base text-red-700"><strong>⚠️ 오류:</strong> {error}</div>}
 
         {/* Row 1: 광고비 / 총매출 / ROAS */}
-        <div>
-          <SectionLabel>개요</SectionLabel>
+        <div ref={overviewRef} className="rounded-2xl p-1">
+          {/* 캡처용 날짜 표시 */}
+          <div className="flex items-center gap-2 mb-3 px-1">
+            <span className="text-sm text-gray-500 font-medium">📅 {dateRangeLabel}</span>
+            {compare && prevStart && (
+              <span className="text-sm text-blue-400">| 비교: {prevStart} ~ {prevEnd}</span>
+            )}
+          </div>
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-3 flex-1">
+              <span className="text-xs font-bold text-gray-400 uppercase tracking-widest whitespace-nowrap">개요</span>
+              <div className="flex-1 h-px bg-gray-200"/>
+            </div>
+            <button onClick={copyToClipboard} disabled={copying}
+              className="ml-3 flex items-center gap-1.5 px-3 py-1.5 border border-gray-200 text-gray-500 rounded-xl text-xs font-bold hover:bg-gray-50 disabled:opacity-60 transition-colors shrink-0">
+              {copying ? '⏳' : '📋'} {copying ? '캡처 중…' : 'COPY'}
+            </button>
+          </div>
           <div className="grid grid-cols-3 gap-4">
             <Card label="광고비 (Meta)" value={krw(totals.spend)} curr={totals.spend} prev={compare?prevTotals.spend:undefined} loading={loading} deltaType="currency"/>
             <Card label="총 매출 (GA4·SNS)" value={krw(adRevenue+viralRevenue)} curr={adRevenue+viralRevenue} prev={compare?prevAdRevenue+prevViralRevenue:undefined} loading={loading} deltaType="currency"/>
@@ -477,7 +522,7 @@ function Dashboard() {
         </div>
 
         {/* Row 3: DA광고매출 / 바이럴매출 */}
-        <div>
+        <div className="mt-4">
           <SectionLabel>자사몰 (GA4) 매출 개요 — SNS 채널 기준 (fb / insta / ig)</SectionLabel>
           <div className="grid grid-cols-2 gap-4">
             <div onClick={() => router.push(`/da-revenue?start=${rangeStart}&end=${rangeEnd}`)}
@@ -490,6 +535,7 @@ function Dashboard() {
             </div>
           </div>
         </div>
+        </div>{/* end overviewRef */}
 
         {/* 테이블 */}
         <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden shadow-sm">
