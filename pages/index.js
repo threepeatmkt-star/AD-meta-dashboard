@@ -314,8 +314,17 @@ function Dashboard() {
     if (!overviewRef.current) return;
     setCopying(true);
     try {
-      const html2canvas = (await import('html2canvas')).default;
-      const canvas = await html2canvas(overviewRef.current, {
+      // html2canvas CDN 로드
+      if (!window.html2canvas) {
+        await new Promise((resolve, reject) => {
+          const script = document.createElement('script');
+          script.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
+          script.onload = resolve;
+          script.onerror = reject;
+          document.head.appendChild(script);
+        });
+      }
+      const canvas = await window.html2canvas(overviewRef.current, {
         backgroundColor: '#f8fafc',
         scale: 2,
         useCORS: true,
@@ -326,11 +335,12 @@ function Dashboard() {
           await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
           alert('📋 클립보드에 복사됐어요! 슬랙/카톡에 붙여넣기 하세요.');
         } catch {
-          // 클립보드 API 안 되는 경우 다운로드로 대체
           const url = URL.createObjectURL(blob);
           const a = document.createElement('a');
-          a.href = url; a.download = `대시보드_개요_${new Date().toLocaleDateString('ko-KR').replace(/\. /g,'-').replace('.','')}png`;
-          a.click(); URL.revokeObjectURL(url);
+          a.href = url;
+          a.download = `대시보드_${dateRangeLabel.replace(/\s/g,'')}.png`;
+          a.click();
+          URL.revokeObjectURL(url);
         }
       }, 'image/png');
     } catch(e) { alert('캡처 실패: ' + e.message); }
