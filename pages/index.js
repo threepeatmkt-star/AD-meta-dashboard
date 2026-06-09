@@ -69,7 +69,7 @@ function DeltaBadge({curr,prev,type='pct'}) {
   const arrow=up?'▲':'▼';
   if(type==='currency') {
     const abs=Math.abs(diff);
-    const fmt=abs>=10000000?`₩${(abs/10000000).toFixed(1)}천만`:abs>=1000000?`₩${(abs/1000000).toFixed(1)}백만`:abs>=10000?`₩${(abs/10000).toFixed(0)}만`:`₩${Math.round(abs).toLocaleString('ko-KR')}`;
+    const fmt='₩'+Math.round(abs).toLocaleString('ko-KR');
     return <span className={`text-sm ml-1 ${color}`}>{arrow}{fmt}</span>;
   }
   if(type==='number') {
@@ -527,7 +527,7 @@ function Dashboard() {
             <Card label="도달" value={num(totals.reach)} curr={totals.reach} prev={compare?prevTotals.reach:undefined} loading={loading} deltaType="number"/>
             <Card label="노출" value={num(totals.impressions)} curr={totals.impressions} prev={compare?prevTotals.impressions:undefined} loading={loading} deltaType="number"/>
             <Card label="클릭 수" value={num(totals.clicks)} curr={totals.clicks} prev={compare?prevTotals.clicks:undefined} loading={loading} deltaType="number"/>
-            <Card label="클릭률 (CTR)" value={ctr(totals.clicks,totals.impressions)} loading={loading} sub="클릭 ÷ 노출" deltaType="pct"/>
+            <Card label="클릭률 (CTR)" value={ctr(totals.clicks,totals.impressions)} curr={totals.impressions>0?totals.clicks/totals.impressions*100:0} prev={compare&&prevTotals.impressions>0?prevTotals.clicks/prevTotals.impressions*100:undefined} loading={loading} sub="클릭 ÷ 노출" deltaType="pct"/>
           </div>
 
           {/* Row 3: DA광고매출 / 바이럴매출 */}
