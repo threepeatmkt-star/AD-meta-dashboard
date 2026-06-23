@@ -2,7 +2,6 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/router';
 import Head from 'next/head';
 
-// ── 날짜 유틸 ────────────────────────────────────────────────────
 function fmtDate(d) {
   const dt = new Date(d);
   return `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`;
@@ -35,8 +34,6 @@ function getPrevRange(s,e) {
   const pe=new Date(sd-86400000),ps=new Date(pe-(days-1)*86400000);
   return [fmtDate(ps),fmtDate(pe)];
 }
-
-// ── 캠페인 정렬: 판매 > ASC > 전환 > 기타 ──────────────────────
 function campaignOrder(name) {
   const n = (name || '').toLowerCase();
   if (n.includes('판매')) return 1;
@@ -51,8 +48,6 @@ function sortByCampaign(arr) {
     return ca !== cb ? ca - cb : (a.name||'').localeCompare(b.name||'', 'ko');
   });
 }
-
-// ── 포맷 ────────────────────────────────────────────────────────
 const krw = n => n?'₩'+Math.round(n).toLocaleString('ko-KR'):'₩0';
 const num = n => n?Number(n).toLocaleString('ko-KR'):'0';
 const ctr = (c,i) => i>0?(c/i*100).toFixed(2)+'%':'0%';
@@ -62,15 +57,15 @@ function roasCls(r) {
   if(r>0) return 'text-rose-500 font-semibold';
   return 'text-gray-400';
 }
+
+// 인라인 델타 (개요 카드용)
 function DeltaBadge({curr,prev,type='pct'}) {
   if(prev==null||prev===0) return null;
   const diff=curr-prev, up=diff>=0;
   const color=up?'text-emerald-600':'text-rose-500';
   const arrow=up?'▲':'▼';
   if(type==='currency') {
-    const abs=Math.abs(diff);
-    const fmt='₩'+Math.round(abs).toLocaleString('ko-KR');
-    return <span className={`text-sm ml-1 ${color}`}>{arrow}{fmt}</span>;
+    return <span className={`text-sm ml-1 ${color}`}>{arrow}₩{Math.round(Math.abs(diff)).toLocaleString('ko-KR')}</span>;
   }
   if(type==='number') {
     return <span className={`text-sm ml-1 ${color}`}>{arrow}{Math.abs(diff).toLocaleString('ko-KR')}</span>;
@@ -78,6 +73,23 @@ function DeltaBadge({curr,prev,type='pct'}) {
   const p=((curr-prev)/prev)*100;
   return <span className={`text-sm ml-1 ${color}`}>{arrow}{Math.abs(p).toFixed(1)}%</span>;
 }
+
+// 테이블 셀 하단 작은 델타 (광고세트 테이블용)
+function SmallDelta({curr,prev,type='pct'}) {
+  if(prev==null||prev===0||curr==null) return null;
+  const diff=curr-prev, up=diff>=0;
+  const color=up?'text-emerald-500':'text-rose-400';
+  const arrow=up?'▲':'▼';
+  if(type==='currency') {
+    return <p className={`text-xs mt-0.5 ${color}`}>{arrow}₩{Math.round(Math.abs(diff)).toLocaleString('ko-KR')}</p>;
+  }
+  if(type==='number') {
+    return <p className={`text-xs mt-0.5 ${color}`}>{arrow}{Math.abs(diff).toLocaleString('ko-KR')}</p>;
+  }
+  const p=((curr-prev)/prev)*100;
+  return <p className={`text-xs mt-0.5 ${color}`}>{arrow}{Math.abs(p).toFixed(1)}%</p>;
+}
+
 function extractProduct(name) {
   if(!name) return '-'; const p=name.split('_'); return p.length>=2?p[1]:p[0];
 }
@@ -106,7 +118,6 @@ function Spinner({sm}) {
   return <svg className={`${sm?'w-4 h-4':'w-6 h-6'} animate-spin text-blue-500`} fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg>;
 }
 
-// ── 카드 ────────────────────────────────────────────────────────
 function Card({label,value,curr,prev,isRoas,roasVal,loading,accent,sub,deltaType='pct'}) {
   return (
     <div className={`rounded-2xl border p-5 shadow-sm ${accent?'bg-blue-50 border-blue-200':'bg-white border-gray-200'}`}>
@@ -132,7 +143,6 @@ function SectionLabel({children}) {
   );
 }
 
-// ── 멀티셀렉트 ──────────────────────────────────────────────────
 function MultiAdsetSelect({options,selected,onChange}) {
   const [open,setOpen]=useState(false);
   const ref=useRef(null);
@@ -166,7 +176,6 @@ function MultiAdsetSelect({options,selected,onChange}) {
   );
 }
 
-// ── 인사이트 패널 ────────────────────────────────────────────────
 function InsightPanel({data,level,dateRange}) {
   const [insights,setInsights]=useState(null);
   const [loading,setLoading]=useState(false);
@@ -235,13 +244,44 @@ function exportToCSV(data,tab,dateRange) {
 
 const BLU='#1877F2';
 
-// ── 로그인 화면 ─────────────────────────────────────────────────
+// html2canvas CDN 로더 (공통)
+async function loadHtml2Canvas() {
+  if (window.html2canvas) return;
+  await new Promise((resolve, reject) => {
+    const script = document.createElement('script');
+    script.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
+    script.onload = resolve;
+    script.onerror = reject;
+    document.head.appendChild(script);
+  });
+}
+async function captureAndCopy(ref, filename) {
+  if (!ref.current) return;
+  await loadHtml2Canvas();
+  const canvas = await window.html2canvas(ref.current, {
+    backgroundColor: '#f8fafc', scale: 2, useCORS: true, logging: false,
+  });
+  return new Promise((resolve) => {
+    canvas.toBlob(async (blob) => {
+      try {
+        await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+        alert('📋 클립보드에 복사됐어요! 슬랙/카톡에 붙여넣기 하세요.');
+      } catch {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url; a.download = filename; a.click();
+        URL.revokeObjectURL(url);
+      }
+      resolve();
+    }, 'image/png');
+  });
+}
+
 function LoginPage({onLogin}) {
   const [id,setId]=useState('');
   const [pw,setPw]=useState('');
   const [error,setError]=useState('');
   const [loading,setLoading]=useState(false);
-
   const submit=async(e)=>{
     e.preventDefault();
     setLoading(true);setError('');
@@ -253,7 +293,6 @@ function LoginPage({onLogin}) {
     } catch { setError('오류가 발생했습니다. 다시 시도해주세요.'); }
     finally { setLoading(false); }
   };
-
   return (
     <div className="min-h-screen bg-slate-50 flex items-center justify-center" style={{fontFamily:"'Pretendard','Apple SD Gothic Neo',sans-serif"}}>
       <Head>
@@ -263,8 +302,8 @@ function LoginPage({onLogin}) {
       <div className="bg-white rounded-3xl shadow-xl border border-gray-200 p-10 w-full max-w-sm mx-4">
         <div className="flex flex-col items-center mb-8">
           <div className="w-14 h-14 rounded-2xl shadow-md mb-4 bg-white border border-gray-100 flex items-center justify-center">
-              <img src="/logo.png" alt="Meta" className="w-10 h-10 object-contain"/>
-            </div>
+            <img src="/logo.png" alt="Meta" className="w-10 h-10 object-contain"/>
+          </div>
           <p className="text-xl font-bold text-gray-900">쓰리핏 메타광고 대시보드</p>
           <span className="mt-1 px-2.5 py-0.5 rounded-full text-xs font-bold text-white" style={{background:BLU}}>삼대오백</span>
           <p className="text-sm text-gray-400 mt-3">사내용 · 로그인 후 이용 가능합니다</p>
@@ -294,12 +333,9 @@ function LoginPage({onLogin}) {
   );
 }
 
-// ── 메인 대시보드 ────────────────────────────────────────────────
 export default function App() {
-  const [authed,setAuthed]=useState(null); // null=로딩중
-  useEffect(()=>{
-    setAuthed(sessionStorage.getItem('dash_auth')==='1');
-  },[]);
+  const [authed,setAuthed]=useState(null);
+  useEffect(()=>{ setAuthed(sessionStorage.getItem('dash_auth')==='1'); },[]);
   if(authed===null) return null;
   if(!authed) return <LoginPage onLogin={()=>setAuthed(true)}/>;
   return <Dashboard/>;
@@ -308,44 +344,23 @@ export default function App() {
 function Dashboard() {
   const router = useRouter();
   const overviewRef = useRef(null);
+  const adsetTableRef = useRef(null);
   const [copying, setCopying] = useState(false);
+  const [adsetCopying, setAdsetCopying] = useState(false);
 
-  const copyToClipboard = async () => {
-    if (!overviewRef.current) return;
+  const copyOverview = async () => {
     setCopying(true);
-    try {
-      // html2canvas CDN 로드
-      if (!window.html2canvas) {
-        await new Promise((resolve, reject) => {
-          const script = document.createElement('script');
-          script.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
-          script.onload = resolve;
-          script.onerror = reject;
-          document.head.appendChild(script);
-        });
-      }
-      const canvas = await window.html2canvas(overviewRef.current, {
-        backgroundColor: '#f8fafc',
-        scale: 2,
-        useCORS: true,
-        logging: false,
-      });
-      canvas.toBlob(async (blob) => {
-        try {
-          await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
-          alert('📋 클립보드에 복사됐어요! 슬랙/카톡에 붙여넣기 하세요.');
-        } catch {
-          const url = URL.createObjectURL(blob);
-          const a = document.createElement('a');
-          a.href = url;
-          a.download = `대시보드_${dateRangeLabel.replace(/\s/g,'')}.png`;
-          a.click();
-          URL.revokeObjectURL(url);
-        }
-      }, 'image/png');
-    } catch(e) { alert('캡처 실패: ' + e.message); }
+    try { await captureAndCopy(overviewRef, `대시보드_개요_${dateRangeLabel.replace(/\s/g,'')}.png`); }
+    catch(e) { alert('캡처 실패: ' + e.message); }
     finally { setCopying(false); }
   };
+  const copyAdsetTable = async () => {
+    setAdsetCopying(true);
+    try { await captureAndCopy(adsetTableRef, `광고세트_${adsetSubTab==='product'?'제품별':'세트별'}_${dateRangeLabel.replace(/\s/g,'')}.png`); }
+    catch(e) { alert('캡처 실패: ' + e.message); }
+    finally { setAdsetCopying(false); }
+  };
+
   const [preset,setPreset]=useState('today');
   const [customStart,setCustomStart]=useState('');
   const [customEnd,setCustomEnd]=useState('');
@@ -399,6 +414,7 @@ function Dashboard() {
   const adsetOptions=tab==='ad'?[...new Set(data.map(d=>d.adsetName).filter(Boolean))].sort():[];
   const filteredAds=selectedAdsets.length>0?data.filter(d=>selectedAdsets.includes(d.adsetName)):data;
   const productGroupData=adsetSubTab==='product'?groupByProduct(data):[];
+  const prevProductGroupData=adsetSubTab==='product'&&compare?groupByProduct(prevData):[];
   const displayData=tab==='adset'&&adsetSubTab==='product'?productGroupData:tab==='ad'?filteredAds:data;
   const dispTotals={...sumRows(displayData)};
   dispTotals.roas=dispTotals.spend>0?Math.round(dispTotals.revenue/dispTotals.spend*1000)/10:0;
@@ -409,7 +425,6 @@ function Dashboard() {
     {v:'thisMonth',l:'이번 달'},{v:'lastMonth',l:'지난 달'},{v:'custom',l:'직접 설정'},
   ];
   const TABS=[{v:'campaign',l:'📊 캠페인'},{v:'adset',l:'🎯 광고세트'},{v:'ad',l:'🖼 소재'}];
-
   const logout=()=>{sessionStorage.removeItem('dash_auth');window.location.reload();};
 
   return (
@@ -498,23 +513,20 @@ function Dashboard() {
       <main className="max-w-screen-xl mx-auto px-6 py-6 space-y-6">
         {error&&<div className="p-5 bg-red-50 border border-red-200 rounded-2xl text-base text-red-700"><strong>⚠️ 오류:</strong> {error}</div>}
 
-        {/* Row 1: 광고비 / 총매출 / ROAS */}
+        {/* 개요 섹션 */}
         <div ref={overviewRef} className="rounded-2xl p-1">
-          {/* 캡처용 날짜 표시 */}
           <div className="flex items-center gap-2 mb-3 px-1">
             <span className="text-sm text-gray-500 font-medium">📅 {dateRangeLabel}</span>
-            {compare && prevStart && (
-              <span className="text-sm text-blue-400">| 비교: {prevStart} ~ {prevEnd}</span>
-            )}
+            {compare&&prevStart&&<span className="text-sm text-blue-400">| 비교: {prevStart} ~ {prevEnd}</span>}
           </div>
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-3 flex-1">
               <span className="text-xs font-bold text-gray-400 uppercase tracking-widest whitespace-nowrap">개요</span>
               <div className="flex-1 h-px bg-gray-200"/>
             </div>
-            <button onClick={copyToClipboard} disabled={copying}
+            <button onClick={copyOverview} disabled={copying}
               className="ml-3 flex items-center gap-1.5 px-3 py-1.5 border border-gray-200 text-gray-500 rounded-xl text-xs font-bold hover:bg-gray-50 disabled:opacity-60 transition-colors shrink-0">
-              {copying ? '⏳' : '📋'} {copying ? '캡처 중…' : 'COPY'}
+              {copying?'⏳':'📋'} {copying?'캡처 중…':'COPY'}
             </button>
           </div>
           <div className="grid grid-cols-3 gap-4">
@@ -522,29 +534,24 @@ function Dashboard() {
             <Card label="총 매출 (GA4·SNS)" value={krw(adRevenue+viralRevenue)} curr={adRevenue+viralRevenue} prev={compare?prevAdRevenue+prevViralRevenue:undefined} loading={loading} deltaType="currency"/>
             <Card label="ROAS" value={`${totals.roas}%`} curr={totals.roas} prev={compare?prevTotals.roas:undefined} isRoas roasVal={totals.roas} loading={loading} deltaType="pct"/>
           </div>
-          {/* Row 2: 도달 / 노출 / 클릭 / CTR */}
           <div className="grid grid-cols-4 gap-4 mt-4">
             <Card label="도달" value={num(totals.reach)} curr={totals.reach} prev={compare?prevTotals.reach:undefined} loading={loading} deltaType="number"/>
             <Card label="노출" value={num(totals.impressions)} curr={totals.impressions} prev={compare?prevTotals.impressions:undefined} loading={loading} deltaType="number"/>
             <Card label="클릭 수" value={num(totals.clicks)} curr={totals.clicks} prev={compare?prevTotals.clicks:undefined} loading={loading} deltaType="number"/>
             <Card label="클릭률 (CTR)" value={ctr(totals.clicks,totals.impressions)} curr={totals.impressions>0?totals.clicks/totals.impressions*100:0} prev={compare&&prevTotals.impressions>0?prevTotals.clicks/prevTotals.impressions*100:undefined} loading={loading} sub="클릭 ÷ 노출" deltaType="pct"/>
           </div>
-
-          {/* Row 3: DA광고매출 / 바이럴매출 */}
           <div className="mt-4">
             <SectionLabel>자사몰 (GA4) 매출 개요 — SNS 채널 기준 (fb / insta / ig)</SectionLabel>
             <div className="grid grid-cols-2 gap-4">
-              <div onClick={() => router.push(`/da-revenue?start=${rangeStart}&end=${rangeEnd}`)}
-                className="cursor-pointer hover:shadow-md transition-shadow">
+              <div onClick={()=>router.push(`/da-revenue?start=${rangeStart}&end=${rangeEnd}`)} className="cursor-pointer hover:shadow-md transition-shadow">
                 <Card label="📣 DA 광고 매출  →" value={krw(adRevenue)} curr={adRevenue} prev={compare?prevAdRevenue:undefined} loading={loading} accent sub="클릭하면 상세 보기" deltaType="currency"/>
               </div>
-              <div onClick={() => router.push(`/viral-revenue?start=${rangeStart}&end=${rangeEnd}`)}
-                className="cursor-pointer hover:shadow-md transition-shadow">
+              <div onClick={()=>router.push(`/viral-revenue?start=${rangeStart}&end=${rangeEnd}`)} className="cursor-pointer hover:shadow-md transition-shadow">
                 <Card label="📱 SNS 바이럴 매출  →" value={krw(viralRevenue)} curr={viralRevenue} prev={compare?prevViralRevenue:undefined} loading={loading} accent sub="클릭하면 상세 보기" deltaType="currency"/>
               </div>
             </div>
           </div>
-        </div>{/* end overviewRef */}
+        </div>
 
         {/* 테이블 */}
         <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden shadow-sm">
@@ -565,7 +572,7 @@ function Dashboard() {
             </div>
           </div>
 
-          {/* 소재 탭 — 광고세트 필터 (별도 행으로 분리) */}
+          {/* 소재 탭 — 광고세트 필터 */}
           {tab==='ad'&&adsetOptions.length>0&&(
             <div className="px-5 py-3 border-b border-gray-100 bg-gray-50/50 flex items-center gap-3">
               <span className="text-sm text-gray-500 font-semibold whitespace-nowrap">광고세트 필터:</span>
@@ -576,15 +583,23 @@ function Dashboard() {
             </div>
           )}
 
-          {/* 광고세트 서브탭 */}
+          {/* 광고세트 서브탭 + COPY 버튼 */}
           {tab==='adset'&&(
-            <div className="flex border-b border-gray-100 bg-gray-50/50">
-              {[{v:'adset',l:'세트별'},{v:'product',l:'캠페인 · 제품별'}].map(st=>(
-                <button key={st.v} onClick={()=>setAdsetSubTab(st.v)}
-                  className={`px-6 py-3 text-sm font-bold transition-colors ${adsetSubTab===st.v?'text-blue-600 border-b-2 border-blue-500 bg-white':'text-gray-400 hover:text-gray-600'}`}>
-                  {st.l}
+            <div className="flex items-center border-b border-gray-100 bg-gray-50/50">
+              <div className="flex">
+                {[{v:'adset',l:'세트별'},{v:'product',l:'캠페인 · 제품별'}].map(st=>(
+                  <button key={st.v} onClick={()=>setAdsetSubTab(st.v)}
+                    className={`px-6 py-3 text-sm font-bold transition-colors ${adsetSubTab===st.v?'text-blue-600 border-b-2 border-blue-500 bg-white':'text-gray-400 hover:text-gray-600'}`}>
+                    {st.l}
+                  </button>
+                ))}
+              </div>
+              <div className="ml-auto px-4">
+                <button onClick={copyAdsetTable} disabled={adsetCopying}
+                  className="flex items-center gap-1.5 px-3 py-1.5 border border-gray-200 text-gray-500 rounded-xl text-xs font-bold hover:bg-gray-50 disabled:opacity-60 transition-colors bg-white">
+                  {adsetCopying?'⏳':'📋'} {adsetCopying?'캡처 중…':'COPY'}
                 </button>
-              ))}
+              </div>
             </div>
           )}
 
@@ -593,7 +608,14 @@ function Dashboard() {
               <Spinner/><p className="text-base text-gray-400">데이터 불러오는 중…</p>
             </div>
           ):(
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto" ref={tab==='adset'?adsetTableRef:null}>
+              {/* 캡처용 날짜 표시 (광고세트 탭에서만) */}
+              {tab==='adset'&&(
+                <div className="flex items-center gap-2 px-5 pt-3 pb-1">
+                  <span className="text-xs text-gray-400 font-medium">📅 {dateRangeLabel}</span>
+                  {compare&&prevStart&&<span className="text-xs text-blue-400">| 비교: {prevStart} ~ {prevEnd}</span>}
+                </div>
+              )}
               <table className="w-full text-base">
                 <thead>
                   <tr className="bg-gray-50 border-b border-gray-200">
@@ -614,7 +636,12 @@ function Dashboard() {
                       <p className="text-4xl mb-3">📭</p><p className="text-gray-400 text-base">데이터가 없습니다.</p>
                     </td></tr>
                   ):displayData.map((row,i)=>{
-                    const prev=prevData.find(p=>p.id===row.id);
+                    // 이전 기간 매칭
+                    const prev = tab==='adset' && adsetSubTab==='product'
+                      ? prevProductGroupData.find(p=>p.id===row.id)
+                      : prevData.find(p=>p.id===row.id);
+                    const showDelta = compare && prev;
+
                     return (
                       <tr key={i} className="hover:bg-blue-50/20 transition-colors">
                         {tab==='ad'&&(
@@ -658,13 +685,50 @@ function Dashboard() {
                             {row.dailyBudget>0?<span className="text-gray-700 font-semibold">{krw(row.dailyBudget)}</span>:<span className="text-sm text-gray-300">CBO</span>}
                           </td>
                         )}
-                        <td className="px-5 py-4 text-right whitespace-nowrap"><span className="text-gray-700 font-semibold">{krw(row.spend)}</span>{compare&&prev&&<DeltaBadge curr={row.spend} prev={prev.spend} type="currency"/>}</td>
-                        <td className="px-5 py-4 text-right whitespace-nowrap"><span className={row.revenue>0?'text-gray-700 font-semibold':'text-gray-300'}>{krw(row.revenue)}</span>{compare&&prev&&<DeltaBadge curr={row.revenue} prev={prev.revenue} type="currency"/>}</td>
-                        <td className="px-5 py-4 text-right whitespace-nowrap"><span className={roasCls(row.roas)}>{row.roas}%</span>{compare&&prev&&<DeltaBadge curr={row.roas} prev={prev.roas} type="pct"/>}</td>
-                        <td className="px-5 py-4 text-right text-gray-600 font-medium whitespace-nowrap">{num(row.reach)}</td>
-                        <td className="px-5 py-4 text-right text-gray-600 font-medium whitespace-nowrap">{num(row.impressions)}</td>
-                        <td className="px-5 py-4 text-right text-gray-600 font-medium whitespace-nowrap">{num(row.clicks)}</td>
-                        <td className="px-5 py-4 text-right text-gray-600 font-medium whitespace-nowrap">{ctr(row.clicks,row.impressions)}</td>
+                        {/* 광고비 */}
+                        <td className="px-5 py-4 text-right whitespace-nowrap">
+                          <span className="text-gray-700 font-semibold">{krw(row.spend)}</span>
+                          {tab==='adset'
+                            ? <SmallDelta curr={row.spend} prev={showDelta?prev.spend:null} type="currency"/>
+                            : showDelta&&<DeltaBadge curr={row.spend} prev={prev.spend} type="currency"/>
+                          }
+                        </td>
+                        {/* 매출액 */}
+                        <td className="px-5 py-4 text-right whitespace-nowrap">
+                          <span className={row.revenue>0?'text-gray-700 font-semibold':'text-gray-300'}>{krw(row.revenue)}</span>
+                          {tab==='adset'
+                            ? <SmallDelta curr={row.revenue} prev={showDelta?prev.revenue:null} type="currency"/>
+                            : showDelta&&<DeltaBadge curr={row.revenue} prev={prev.revenue} type="currency"/>
+                          }
+                        </td>
+                        {/* ROAS */}
+                        <td className="px-5 py-4 text-right whitespace-nowrap">
+                          <span className={roasCls(row.roas)}>{row.roas}%</span>
+                          {tab==='adset'
+                            ? <SmallDelta curr={row.roas} prev={showDelta?prev.roas:null} type="pct"/>
+                            : showDelta&&<DeltaBadge curr={row.roas} prev={prev.roas} type="pct"/>
+                          }
+                        </td>
+                        {/* 도달 */}
+                        <td className="px-5 py-4 text-right text-gray-600 font-medium whitespace-nowrap">
+                          {num(row.reach)}
+                          {tab==='adset'&&<SmallDelta curr={row.reach} prev={showDelta?prev.reach:null} type="number"/>}
+                        </td>
+                        {/* 노출 */}
+                        <td className="px-5 py-4 text-right text-gray-600 font-medium whitespace-nowrap">
+                          {num(row.impressions)}
+                          {tab==='adset'&&<SmallDelta curr={row.impressions} prev={showDelta?prev.impressions:null} type="number"/>}
+                        </td>
+                        {/* 클릭 */}
+                        <td className="px-5 py-4 text-right text-gray-600 font-medium whitespace-nowrap">
+                          {num(row.clicks)}
+                          {tab==='adset'&&<SmallDelta curr={row.clicks} prev={showDelta?prev.clicks:null} type="number"/>}
+                        </td>
+                        {/* CTR */}
+                        <td className="px-5 py-4 text-right text-gray-600 font-medium whitespace-nowrap">
+                          {ctr(row.clicks,row.impressions)}
+                          {tab==='adset'&&showDelta&&<SmallDelta curr={row.impressions>0?row.clicks/row.impressions*100:0} prev={prev.impressions>0?prev.clicks/prev.impressions*100:null} type="pct"/>}
+                        </td>
                       </tr>
                     );
                   })}
