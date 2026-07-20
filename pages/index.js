@@ -38,9 +38,13 @@ function LoginPage({ onLogin }) {
       <div className="bg-white rounded-3xl shadow-xl border border-gray-200 p-10 w-full max-w-sm mx-4">
         <div className="flex flex-col items-center mb-8">
           <div className="w-14 h-14 rounded-2xl shadow-md mb-4 bg-white border border-gray-100 flex items-center justify-center">
-            <img src="/logo.png" alt="" className="w-10 h-10 object-contain"/>
+            <img src="/meta_logo.png" alt="" className="w-10 h-10 object-contain"/>
           </div>
-          <p className="text-xl font-bold text-gray-900"><span style={{color:BLU}}>[THREEPEAT]</span> Meta Ads Dashboard</p>
+          <p className="text-xl font-bold text-gray-900">
+            <span className="inline-block px-2.5 py-0.5 rounded-full bg-gray-900 text-white text-sm align-middle">THREEPEAT</span>
+            {' '}
+            <span className="align-middle">Meta Ads Dashboard</span>
+          </p>
           <p className="text-xs text-gray-300 mt-1">Meta Ads × GA4 통합 효율 분석</p>
           <p className="text-sm text-gray-400 mt-3">사내용 · 로그인 후 이용 가능합니다</p>
         </div>
@@ -85,12 +89,11 @@ function BrandPicker() {
         <div className="max-w-screen-xl mx-auto px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl shadow-sm bg-white border border-gray-100 flex items-center justify-center overflow-hidden">
-              <img src="/logo.png" alt="" className="w-7 h-7 object-contain"/>
+              <img src="/meta_logo.png" alt="" className="w-7 h-7 object-contain"/>
             </div>
-            <div className="flex items-baseline flex-wrap gap-x-2 gap-y-0.5">
-              <p className="text-base font-bold text-gray-900 whitespace-nowrap">
-                <span style={{color:BLU}}>[THREEPEAT]</span> Meta Ads Dashboard
-              </p>
+            <div className="flex items-center flex-wrap gap-x-2 gap-y-0.5">
+              <span className="px-3 py-1 rounded-full bg-gray-900 text-white text-xs font-bold tracking-wide whitespace-nowrap">THREEPEAT</span>
+              <p className="text-base font-bold text-gray-900 whitespace-nowrap">Meta Ads Dashboard</p>
               <span className="hidden sm:inline text-gray-300">|</span>
               <p className="w-full sm:w-auto text-[11px] text-gray-300 sm:text-sm sm:text-gray-400">
                 Meta Ads × GA4 통합 효율 분석
@@ -114,7 +117,7 @@ function BrandPicker() {
             <button key={b.id} onClick={() => router.push(`/${b.id}`)}
               className="group relative bg-white rounded-3xl border-2 border-gray-200 p-10 text-left shadow-sm hover:shadow-2xl hover:-translate-y-1 transition-all duration-200"
               style={{ borderColor: 'transparent' }}
-              onMouseEnter={e => { e.currentTarget.style.borderColor = b.color; }}
+              onMouseEnter={e => { e.currentTarget.style.borderColor = '#111827'; }}
               onMouseLeave={e => { e.currentTarget.style.borderColor = 'transparent'; }}>
               <div className="flex items-center gap-5 mb-6">
                 <div className="w-20 h-20 rounded-2xl bg-white border border-gray-100 shadow-md flex items-center justify-center overflow-hidden shrink-0">
@@ -123,13 +126,12 @@ function BrandPicker() {
                 </div>
                 <div>
                   <p className="text-2xl md:text-3xl font-bold text-gray-900">{b.name}</p>
-                  <p className="text-sm font-semibold tracking-wider mt-1" style={{color:b.color}}>{b.nameEn}</p>
+                  <p className="text-sm font-semibold tracking-wider mt-1 text-gray-500">{b.nameEn}</p>
                 </div>
               </div>
               <p className="text-gray-500 text-base mb-1">{b.desc}</p>
               <p className="text-gray-300 text-sm">{b.site}</p>
-              <div className="mt-7 inline-flex items-center gap-2 px-5 py-3 rounded-xl text-white text-base font-bold shadow-sm group-hover:gap-3 transition-all"
-                style={{background:b.color}}>
+              <div className="mt-7 inline-flex items-center gap-2 px-5 py-3 rounded-xl text-white text-base font-bold shadow-sm group-hover:gap-3 transition-all bg-gray-900">
                 대시보드 열기 <span>→</span>
               </div>
             </button>
