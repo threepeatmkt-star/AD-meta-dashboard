@@ -375,10 +375,9 @@ export default function Dashboard({ brand }) {
                   onError={e=>{e.target.style.display='none';}}/>
               </div>
               <div className="text-left">
-                <div className="flex items-baseline flex-wrap gap-x-2 gap-y-0.5">
-                  <p className="text-base sm:text-lg font-bold text-gray-900 whitespace-nowrap">
-                    <span style={{color:BC}}>[THREEPEAT]</span> Meta Ads Dashboard
-                  </p>
+                <div className="flex items-center flex-wrap gap-x-2 gap-y-0.5">
+                  <span className="px-3 py-1 rounded-full text-white text-xs font-bold whitespace-nowrap" style={{background:BC}}>{brand.name}</span>
+                  <p className="text-base sm:text-lg font-bold text-gray-900 whitespace-nowrap">Meta Ads Dashboard</p>
                   <span className="hidden sm:inline text-gray-300">|</span>
                   <p className="w-full sm:w-auto text-[11px] text-gray-300 sm:text-sm sm:text-gray-400">
                     Meta Ads × GA4 통합 효율 분석
@@ -388,7 +387,6 @@ export default function Dashboard({ brand }) {
             </button>
           </div>
           <div className="flex items-center gap-3">
-            <span className="px-2.5 py-1 rounded-full text-xs font-bold text-white whitespace-nowrap" style={{background:BC}}>{brand.name}</span>
             {lastUpdated&&<span className="text-sm text-gray-400 hidden lg:inline">업데이트: {lastUpdated}</span>}
             <button onClick={()=>router.push('/')}
               className="px-3 py-2.5 border border-gray-200 text-gray-500 rounded-xl text-sm font-semibold hover:bg-gray-50 transition-colors whitespace-nowrap">
