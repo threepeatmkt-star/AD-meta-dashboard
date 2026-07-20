@@ -32,7 +32,7 @@ function LoginPage({ onLogin }) {
   return (
     <div className="min-h-screen bg-slate-50 flex items-center justify-center" style={{fontFamily:"'Pretendard','Apple SD Gothic Neo',sans-serif"}}>
       <Head>
-        <title>로그인 — 쓰리핏 메타광고 대시보드</title>
+        <title>로그인 — THREEPEAT Meta Ads Dashboard</title>
         <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css"/>
       </Head>
       <div className="bg-white rounded-3xl shadow-xl border border-gray-200 p-10 w-full max-w-sm mx-4">
@@ -40,7 +40,8 @@ function LoginPage({ onLogin }) {
           <div className="w-14 h-14 rounded-2xl shadow-md mb-4 bg-white border border-gray-100 flex items-center justify-center">
             <img src="/logo.png" alt="" className="w-10 h-10 object-contain"/>
           </div>
-          <p className="text-xl font-bold text-gray-900">쓰리핏 메타광고 대시보드</p>
+          <p className="text-xl font-bold text-gray-900"><span style={{color:BLU}}>[THREEPEAT]</span> Meta Ads Dashboard</p>
+          <p className="text-xs text-gray-300 mt-1">Meta Ads × GA4 통합 효율 분석</p>
           <p className="text-sm text-gray-400 mt-3">사내용 · 로그인 후 이용 가능합니다</p>
         </div>
         <form onSubmit={submit} className="space-y-4">
@@ -75,7 +76,7 @@ function BrandPicker() {
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col" style={{fontFamily:"'Pretendard','Apple SD Gothic Neo',sans-serif"}}>
       <Head>
-        <title>브랜드 선택 — 쓰리핏 메타광고 대시보드</title>
+        <title>브랜드 선택 — THREEPEAT Meta Ads Dashboard</title>
         <meta name="viewport" content="width=device-width,initial-scale=1"/>
         <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css"/>
       </Head>
@@ -86,7 +87,15 @@ function BrandPicker() {
             <div className="w-10 h-10 rounded-xl shadow-sm bg-white border border-gray-100 flex items-center justify-center overflow-hidden">
               <img src="/logo.png" alt="" className="w-7 h-7 object-contain"/>
             </div>
-            <p className="text-base font-bold text-gray-900">쓰리핏 메타광고 대시보드</p>
+            <div className="flex items-baseline flex-wrap gap-x-2 gap-y-0.5">
+              <p className="text-base font-bold text-gray-900 whitespace-nowrap">
+                <span style={{color:BLU}}>[THREEPEAT]</span> Meta Ads Dashboard
+              </p>
+              <span className="hidden sm:inline text-gray-300">|</span>
+              <p className="w-full sm:w-auto text-[11px] text-gray-300 sm:text-sm sm:text-gray-400">
+                Meta Ads × GA4 통합 효율 분석
+              </p>
+            </div>
           </div>
           <button onClick={logout} className="px-3 py-2 border border-gray-200 text-gray-500 rounded-xl text-sm font-semibold hover:bg-gray-50 transition-colors">
             로그아웃
