@@ -1,9 +1,10 @@
 /**
- * pages/api/revenue-detail.js
- * DA 매출 / 바이럴 매출 상세 데이터
- * GET /api/revenue-detail?type=da|viral&startDate=&endDate=
+ * pages/api/revenue-detail.js — 멀티 브랜드
+ * GET /api/revenue-detail?brand=samdae500|mxssive&type=da|viral&startDate=&endDate=
  */
 import axios from 'axios';
+import { resolveBrand, SNS_REGEX } from '../../lib/brandEnv';
+import { BRANDS, extractProduct, normalizeProduct, campaignOrder } from '../../lib/brands';
 
 const META_BASE = 'https://graph.facebook.com/v20.0';
 
@@ -27,33 +28,10 @@ async function fetchMetaPages(url, params) {
   return all;
 }
 
-function normalizeProduct(name) {
-  if (!name) return '-';
-  if (name.includes('글리펌프') || name.includes('글리아르')) return '글리펌프+글리아르';
-  if (name.includes('실온닭가슴살')) return '실온닭가슴살';
-  return name;
-}
-
-function extractProduct(name) {
-  if (!name) return '-';
-  const p = name.split('_');
-  return p.length >= 2 ? p[1] : p[0];
-}
-
-function campaignOrder(name) {
-  const n = (name || '').toLowerCase();
-  if (n.includes('판매')) return 1;
-  if (n.includes('asc')) return 2;
-  if (n.includes('전환')) return 3;
-  return 4;
-}
-
-// YYYYMMDD → YYYY-MM-DD
 function parseGA4Date(d) {
   return `${d.slice(0,4)}-${d.slice(4,6)}-${d.slice(6,8)}`;
 }
 
-// 날짜 → 주차 레이블 (예: 5/4~5/10)
 function getWeekLabel(dateStr) {
   const d = new Date(dateStr);
   const dow = d.getDay();
@@ -66,29 +44,31 @@ function getWeekLabel(dateStr) {
 
 export default async function handler(req, res) {
   if (req.method !== 'GET') return res.status(405).end();
-  const { type, startDate, endDate } = req.query;
+  const { type, startDate, endDate, brand = 'samdae500' } = req.query;
   if (!type || !startDate || !endDate) return res.status(400).json({ error: '파라미터 오류' });
 
-  const SNS_REGEX = '.*fb.*|.*insta.*|.*ig.*|.*l\\.instagram.*';
+  const cfg = resolveBrand(brand);
+  if (cfg.missing.length > 0)
+    return res.status(500).json({ error: `환경변수 미설정: ${cfg.missing.join(', ')}` });
+
+  const brandCfg = BRANDS[cfg.brandId];
+  const propId = cfg.ga4PropertyId;
 
   try {
     const ga4Token = await getGA4AccessToken();
-    const propId = process.env.GA4_PROPERTY_ID;
 
     // ── DA 매출 상세 ──────────────────────────────────────────────
     if (type === 'da') {
-      // Meta 일별 광고세트 인사이트
-      const metaInsights = await fetchMetaPages(`${META_BASE}/act_${process.env.META_AD_ACCOUNT_ID}/insights`, {
+      const metaInsights = await fetchMetaPages(`${META_BASE}/act_${cfg.adAccountId}/insights`, {
         level: 'adset',
         fields: 'date_start,campaign_name,adset_name,spend',
         time_range: JSON.stringify({ since: startDate, until: endDate }),
         time_increment: 1,
         filtering: JSON.stringify([{ field: 'adset.effective_status', operator: 'IN', value: ['ACTIVE'] }]),
         limit: 500,
-        access_token: process.env.META_ACCESS_TOKEN,
+        access_token: cfg.metaToken,
       });
 
-      // GA4 일별 DA 매출 (캠페인별)
       const { data: ga4 } = await axios.post(
         `https://analyticsdata.googleapis.com/v1beta/properties/${propId}:runReport`,
         {
@@ -113,7 +93,6 @@ export default async function handler(req, res) {
         revenue: parseFloat(r.metricValues[0].value) || 0,
       }));
 
-      // 일별 총합
       const dailyMap = {};
       ga4Rows.forEach(r => {
         if (!dailyMap[r.date]) dailyMap[r.date] = { date: r.date, revenue: 0 };
@@ -121,7 +100,6 @@ export default async function handler(req, res) {
       });
       const dailyRevenue = Object.values(dailyMap).sort((a, b) => a.date.localeCompare(b.date));
 
-      // 캠페인별 집계
       const campaignMap = {};
       ga4Rows.forEach(r => {
         if (!campaignMap[r.campaign]) campaignMap[r.campaign] = { campaign: r.campaign, revenue: 0, order: campaignOrder(r.campaign) };
@@ -129,10 +107,9 @@ export default async function handler(req, res) {
       });
       const campaignBreakdown = Object.values(campaignMap).sort((a, b) => a.order - b.order);
 
-      // 주간 × 제품별 테이블
       const weekProductMap = {};
       metaInsights.forEach(m => {
-        const prod = normalizeProduct(extractProduct(m.adset_name));
+        const prod = normalizeProduct(extractProduct(m.adset_name), brandCfg);
         const week = getWeekLabel(m.date_start);
         const key = `${campaignOrder(m.campaign_name)}|${m.campaign_name}|${prod}`;
         if (!weekProductMap[key]) weekProductMap[key] = {
@@ -143,7 +120,6 @@ export default async function handler(req, res) {
         weekProductMap[key].weeks[week].spend += parseFloat(m.spend) || 0;
       });
 
-      // GA4 매출을 캠페인 내 adset 비율로 배분 (주간 기준)
       const weekGA4Map = {};
       ga4Rows.forEach(r => {
         const week = getWeekLabel(r.date);
@@ -152,10 +128,8 @@ export default async function handler(req, res) {
         weekGA4Map[key] += r.revenue;
       });
 
-      // 캠페인 내 주간 spend 비율로 GA4 매출 배분
       Object.values(weekProductMap).forEach(item => {
         Object.keys(item.weeks).forEach(week => {
-          // 같은 캠페인의 총 spend 계산
           const totalSpend = Object.values(weekProductMap)
             .filter(x => x.campaign === item.campaign)
             .reduce((s, x) => s + (x.weeks[week]?.spend || 0), 0);
@@ -168,19 +142,14 @@ export default async function handler(req, res) {
         });
       });
 
-      const weeklyTable = Object.values(weekProductMap)
-        .sort((a, b) => a.order - b.order)
-        .map(item => ({ ...item, weeks: item.weeks }));
+      const weeklyTable = Object.values(weekProductMap).sort((a, b) => a.order - b.order);
+      const weeks = [...new Set(metaInsights.map(m => getWeekLabel(m.date_start)))].sort();
 
-      const weeks = [...new Set(
-        metaInsights.map(m => getWeekLabel(m.date_start))
-      )].sort();
-
-      res.json({ dailyRevenue, campaignBreakdown, weeklyTable, weeks });
+      return res.json({ dailyRevenue, campaignBreakdown, weeklyTable, weeks });
     }
 
     // ── 바이럴 매출 상세 ──────────────────────────────────────────
-    else if (type === 'viral') {
+    if (type === 'viral') {
       const { data: ga4 } = await axios.post(
         `https://analyticsdata.googleapis.com/v1beta/properties/${propId}:runReport`,
         {
@@ -201,10 +170,9 @@ export default async function handler(req, res) {
         sessions: parseInt(r.metricValues[1].value) || 0,
       })).filter(r => {
         const medium = r.sourceMedium.toLowerCase().split(' / ')[1] || '';
-        return !medium.includes('cpm'); // cpm 제외
+        return !medium.includes('cpm');
       });
 
-      // 일별 집계
       const dailyMap = {};
       rows.forEach(r => {
         if (!dailyMap[r.date]) dailyMap[r.date] = { date: r.date, revenue: 0, sessions: 0 };
@@ -213,7 +181,6 @@ export default async function handler(req, res) {
       });
       const dailyData = Object.values(dailyMap).sort((a, b) => a.date.localeCompare(b.date));
 
-      // 소스별 집계
       const sourceMap = {};
       rows.forEach(r => {
         const source = r.sourceMedium.split(' / ')[0] || r.sourceMedium;
@@ -223,10 +190,10 @@ export default async function handler(req, res) {
       });
       const sourceBreakdown = Object.values(sourceMap).sort((a, b) => b.revenue - a.revenue);
 
-      res.json({ dailyData, sourceBreakdown });
-    } else {
-      res.status(400).json({ error: '올바르지 않은 type' });
+      return res.json({ dailyData, sourceBreakdown });
     }
+
+    return res.status(400).json({ error: '올바르지 않은 type' });
   } catch (err) {
     console.error('[revenue-detail error]', err?.response?.data || err.message);
     res.status(500).json({ error: err?.response?.data?.error?.message || err.message });

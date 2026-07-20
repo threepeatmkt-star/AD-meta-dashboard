@@ -1,9 +1,9 @@
 /**
- * pages/api/dashboard.js — v6
- * GA4 매출: .*fb.*|.*insta.*|.*ig.* 정규식 필터 적용
- * 비디오 썸네일: video_id → 썸네일 별도 조회
+ * pages/api/dashboard.js — v7 (멀티 브랜드)
+ * GET /api/dashboard?brand=samdae500|mxssive&startDate=&endDate=&level=
  */
 import axios from 'axios';
+import { resolveBrand, SNS_REGEX } from '../../lib/brandEnv';
 
 const META_BASE = 'https://graph.facebook.com/v20.0';
 
@@ -27,8 +27,7 @@ async function fetchMetaPages(url, params) {
   return all;
 }
 
-async function getMetaInsights(level, startDate, endDate) {
-  const { META_AD_ACCOUNT_ID: acctId, META_ACCESS_TOKEN: token } = process.env;
+async function getMetaInsights(cfg, level, startDate, endDate) {
   const fields = [
     'campaign_id','campaign_name',
     ...(level !== 'campaign' ? ['adset_id','adset_name'] : []),
@@ -36,15 +35,14 @@ async function getMetaInsights(level, startDate, endDate) {
     'spend','reach','impressions','inline_link_clicks',
   ].join(',');
   const statusField = { campaign:'campaign.effective_status', adset:'adset.effective_status', ad:'ad.effective_status' }[level];
-  return fetchMetaPages(`${META_BASE}/act_${acctId}/insights`, {
+  return fetchMetaPages(`${META_BASE}/act_${cfg.adAccountId}/insights`, {
     level, fields,
     time_range: JSON.stringify({ since: startDate, until: endDate }),
     filtering: JSON.stringify([{ field: statusField, operator: 'IN', value: ['ACTIVE'] }]),
-    limit: 100, access_token: token,
+    limit: 100, access_token: cfg.metaToken,
   });
 }
 
-// 비디오 ID로 썸네일 URL 가져오기
 async function getVideoThumbnail(videoId, token) {
   try {
     const res = await axios.get(`${META_BASE}/${videoId}`, {
@@ -53,7 +51,6 @@ async function getVideoThumbnail(videoId, token) {
     });
     const thumbs = res.data?.thumbnails?.data;
     if (thumbs && thumbs.length > 0) {
-      // 가장 큰 썸네일 선택
       const best = thumbs.reduce((a, b) => ((b.width||0) > (a.width||0) ? b : a), thumbs[0]);
       return best.uri || null;
     }
@@ -61,27 +58,21 @@ async function getVideoThumbnail(videoId, token) {
   return null;
 }
 
-async function getMetaThumbnails() {
-  const { META_AD_ACCOUNT_ID: acctId, META_ACCESS_TOKEN: token } = process.env;
-  const ads = await fetchMetaPages(`${META_BASE}/act_${acctId}/ads`, {
+async function getMetaThumbnails(cfg) {
+  const token = cfg.metaToken;
+  const ads = await fetchMetaPages(`${META_BASE}/act_${cfg.adAccountId}/ads`, {
     fields: 'id,creative{image_url,thumbnail_url,video_id,object_story_spec{video_data{image_url,video_id}}}',
     filtering: JSON.stringify([{ field: 'effective_status', operator: 'IN', value: ['ACTIVE'] }]),
     limit: 100, access_token: token,
   });
 
-  // 비디오 ID 모아서 병렬 조회
-  const videoFetches = [];
   const adVideoMap = {};
   ads.forEach(a => {
     const c = a.creative;
     const vid = c?.video_id || c?.object_story_spec?.video_data?.video_id;
-    if (vid && !c?.image_url) {
-      adVideoMap[a.id] = vid;
-      if (!videoFetches.find(f => f.vid === vid)) videoFetches.push({ vid, token });
-    }
+    if (vid && !c?.image_url) adVideoMap[a.id] = vid;
   });
 
-  // 비디오 썸네일 병렬 조회
   const videoThumbMap = {};
   await Promise.all(
     [...new Set(Object.values(adVideoMap))].map(async vid => {
@@ -102,20 +93,18 @@ async function getMetaThumbnails() {
   }));
 }
 
-async function getAdsetBudgets() {
-  const { META_AD_ACCOUNT_ID: acctId, META_ACCESS_TOKEN: token } = process.env;
-  const adsets = await fetchMetaPages(`${META_BASE}/act_${acctId}/adsets`, {
+async function getAdsetBudgets(cfg) {
+  const adsets = await fetchMetaPages(`${META_BASE}/act_${cfg.adAccountId}/adsets`, {
     fields: 'id,daily_budget',
     filtering: JSON.stringify([{ field: 'effective_status', operator: 'IN', value: ['ACTIVE'] }]),
-    limit: 100, access_token: token,
+    limit: 100, access_token: cfg.metaToken,
   });
   return Object.fromEntries(adsets.map(a => [a.id, parseInt(a.daily_budget) || 0]));
 }
 
-async function getGA4Revenue(startDate, endDate, ga4Token) {
-  const { GA4_PROPERTY_ID: propId } = process.env;
+async function getGA4Revenue(cfg, startDate, endDate, ga4Token) {
   const { data } = await axios.post(
-    `https://analyticsdata.googleapis.com/v1beta/properties/${propId}:runReport`,
+    `https://analyticsdata.googleapis.com/v1beta/properties/${cfg.ga4PropertyId}:runReport`,
     {
       dateRanges: [{ startDate, endDate }],
       dimensions: [{ name: 'sessionCampaignName' }, { name: 'sessionManualAdContent' }],
@@ -132,20 +121,17 @@ async function getGA4Revenue(startDate, endDate, ga4Token) {
     }));
 }
 
-// GA4 SNS 매출 — 정규식: .*fb.*|.*insta.*|.*ig.*
-async function getGA4RevenueSplit(startDate, endDate, ga4Token) {
-  const { GA4_PROPERTY_ID: propId } = process.env;
+async function getGA4RevenueSplit(cfg, startDate, endDate, ga4Token) {
   const { data } = await axios.post(
-    `https://analyticsdata.googleapis.com/v1beta/properties/${propId}:runReport`,
+    `https://analyticsdata.googleapis.com/v1beta/properties/${cfg.ga4PropertyId}:runReport`,
     {
       dateRanges: [{ startDate, endDate }],
       dimensions: [{ name: 'sessionSourceMedium' }],
       metrics: [{ name: 'purchaseRevenue' }],
-      // SNS 채널(FB/인스타)만 필터링
       dimensionFilter: {
         filter: {
           fieldName: 'sessionSourceMedium',
-          stringFilter: { matchType: 'FULL_REGEXP', value: '.*fb.*|.*insta.*|.*ig.*|.*l\.instagram.*' },
+          stringFilter: { matchType: 'FULL_REGEXP', value: SNS_REGEX },
         },
       },
     },
@@ -168,27 +154,21 @@ function calcRoas(revenue, spend) {
 
 export default async function handler(req, res) {
   if (req.method !== 'GET') return res.status(405).end();
-  const { startDate, endDate, level = 'campaign' } = req.query;
+  const { startDate, endDate, level = 'campaign', brand = 'samdae500' } = req.query;
   if (!startDate || !endDate) return res.status(400).json({ error: '날짜를 선택해주세요.' });
 
-  const missing = [
-    !process.env.META_AD_ACCOUNT_ID && 'META_AD_ACCOUNT_ID',
-    !process.env.META_ACCESS_TOKEN && 'META_ACCESS_TOKEN',
-    !process.env.GA4_PROPERTY_ID && 'GA4_PROPERTY_ID',
-    !process.env.GA4_CLIENT_ID && 'GA4_CLIENT_ID',
-    !process.env.GA4_CLIENT_SECRET && 'GA4_CLIENT_SECRET',
-    !process.env.GA4_REFRESH_TOKEN && 'GA4_REFRESH_TOKEN',
-  ].filter(Boolean);
-  if (missing.length > 0) return res.status(500).json({ error: `환경변수 미설정: ${missing.join(', ')}` });
+  const cfg = resolveBrand(brand);
+  if (cfg.missing.length > 0)
+    return res.status(500).json({ error: `환경변수 미설정: ${cfg.missing.join(', ')}` });
 
   try {
     const ga4Token = await getGA4AccessToken();
     const [adInsights, ga4Data, revenueSplit, thumbnails, budgets] = await Promise.all([
-      getMetaInsights('ad', startDate, endDate),
-      getGA4Revenue(startDate, endDate, ga4Token),
-      getGA4RevenueSplit(startDate, endDate, ga4Token),
-      level === 'ad' ? getMetaThumbnails() : Promise.resolve({}),
-      level === 'adset' ? getAdsetBudgets() : Promise.resolve({}),
+      getMetaInsights(cfg, 'ad', startDate, endDate),
+      getGA4Revenue(cfg, startDate, endDate, ga4Token),
+      getGA4RevenueSplit(cfg, startDate, endDate, ga4Token),
+      level === 'ad' ? getMetaThumbnails(cfg) : Promise.resolve({}),
+      level === 'adset' ? getAdsetBudgets(cfg) : Promise.resolve({}),
     ]);
 
     const adWithRevenue = adInsights.map(ad => {
@@ -209,7 +189,7 @@ export default async function handler(req, res) {
       return res.json({ data, ...revenueSplit });
     }
 
-    const levelInsights = await getMetaInsights(level, startDate, endDate);
+    const levelInsights = await getMetaInsights(cfg, level, startDate, endDate);
     const revenueMap = {};
     adWithRevenue.forEach(ad => {
       const key = level === 'adset' ? ad.adset_id : ad.campaign_id;
