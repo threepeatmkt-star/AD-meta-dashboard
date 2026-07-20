@@ -138,12 +138,15 @@ function BrandPicker() {
           ))}
         </div>
 
-        <div className="mt-10 px-6 py-4 bg-white border border-dashed border-gray-300 rounded-2xl text-center max-w-md">
-          <p className="text-sm text-gray-400">
-            🔗 <span className="font-semibold text-gray-500">통합 조회 (삼대오백 + 엠엑시브)</span><br/>
-            <span className="text-xs">준비 중입니다</span>
+        <button onClick={() => router.push('/all')}
+          className="mt-10 px-8 py-5 bg-white border-2 border-gray-200 rounded-2xl text-center max-w-md w-full shadow-sm hover:shadow-lg hover:border-gray-900 transition-all group">
+          <p className="text-base font-bold text-gray-900">
+            🔗 통합 조회 <span className="text-gray-400 font-medium">(삼대오백 + 엠엑시브)</span>
           </p>
-        </div>
+          <p className="text-xs text-gray-400 mt-1 group-hover:text-gray-600 transition-colors">
+            전사 합계 · 브랜드 비교 · 통합 테이블 →
+          </p>
+        </button>
       </main>
     </div>
   );
