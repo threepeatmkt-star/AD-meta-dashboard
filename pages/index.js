@@ -40,11 +40,8 @@ function LoginPage({ onLogin }) {
           <div className="w-14 h-14 rounded-2xl shadow-md mb-4 bg-white border border-gray-100 flex items-center justify-center">
             <img src="/meta_logo.png" alt="" className="w-10 h-10 object-contain"/>
           </div>
-          <p className="text-xl font-bold text-gray-900">
-            <span className="inline-block px-2.5 py-0.5 rounded-full bg-gray-900 text-white text-sm align-middle">THREEPEAT</span>
-            {' '}
-            <span className="align-middle">Meta Ads Dashboard</span>
-          </p>
+          <span className="inline-block px-3 py-1 rounded-full bg-gray-900 text-white text-xs font-bold tracking-wide mb-2">THREEPEAT</span>
+          <p className="text-xl font-bold text-gray-900">Meta Ads Dashboard</p>
           <p className="text-xs text-gray-300 mt-1">Meta Ads × GA4 통합 효율 분석</p>
           <p className="text-sm text-gray-400 mt-3">사내용 · 로그인 후 이용 가능합니다</p>
         </div>
