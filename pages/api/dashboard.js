@@ -43,53 +43,120 @@ async function getMetaInsights(cfg, level, startDate, endDate) {
   });
 }
 
-async function getVideoThumbnail(videoId, token) {
+// 비디오 ID → 고화질 썸네일 + 재생 소스
+async function getVideoAsset(videoId, token) {
   try {
     const res = await axios.get(`${META_BASE}/${videoId}`, {
-      params: { fields: 'thumbnails', access_token: token },
-      timeout: 10000,
+      params: { fields: 'thumbnails,source,permalink_url,picture', access_token: token },
+      timeout: 15000,
     });
-    const thumbs = res.data?.thumbnails?.data;
-    if (thumbs && thumbs.length > 0) {
-      const best = thumbs.reduce((a, b) => ((b.width||0) > (a.width||0) ? b : a), thumbs[0]);
-      return best.uri || null;
-    }
-  } catch {}
-  return null;
+    const thumbs = res.data?.thumbnails?.data || [];
+    const best = thumbs.length
+      ? thumbs.reduce((a, b) => ((b.width || 0) > (a.width || 0) ? b : a), thumbs[0])
+      : null;
+    return {
+      thumb: best?.uri || res.data?.picture || null,
+      source: res.data?.source || null,
+      permalink: res.data?.permalink_url || null,
+    };
+  } catch {
+    return { thumb: null, source: null, permalink: null };
+  }
 }
 
-async function getMetaThumbnails(cfg) {
+// image_hash → 원본 이미지 URL (adimages 조회)
+async function getImageByHash(hashes, cfg) {
+  const out = {};
+  const list = [...new Set(hashes.filter(Boolean))];
+  for (let i = 0; i < list.length; i += 40) {
+    const chunk = list.slice(i, i + 40);
+    try {
+      const res = await axios.get(`${META_BASE}/act_${cfg.adAccountId}/adimages`, {
+        params: {
+          hashes: JSON.stringify(chunk),
+          fields: 'hash,permalink_url,url,width,height',
+          access_token: cfg.metaToken,
+        },
+        timeout: 20000,
+      });
+      (res.data.data || []).forEach(img => {
+        out[img.hash] = img.permalink_url || img.url || null;
+      });
+    } catch {}
+  }
+  return out;
+}
+
+async function getMetaCreatives(cfg) {
   const token = cfg.metaToken;
   const ads = await fetchMetaPages(`${META_BASE}/act_${cfg.adAccountId}/ads`, {
-    fields: 'id,creative{image_url,thumbnail_url,video_id,object_story_spec{video_data{image_url,video_id}}}',
+    fields: [
+      'id',
+      'creative{id,name,image_url,thumbnail_url,image_hash,video_id,' +
+      'object_story_spec{video_data{image_url,video_id},link_data{picture,image_hash}},' +
+      'asset_feed_spec{images{hash,url},videos{video_id,thumbnail_url}}}',
+    ].join(','),
+    thumbnail_width: 1080,
+    thumbnail_height: 1080,
     filtering: JSON.stringify([{ field: 'effective_status', operator: 'IN', value: ['ACTIVE'] }]),
-    limit: 100, access_token: token,
+    limit: 100,
+    access_token: token,
   });
 
-  const adVideoMap = {};
-  ads.forEach(a => {
-    const c = a.creative;
-    const vid = c?.video_id || c?.object_story_spec?.video_data?.video_id;
-    if (vid && !c?.image_url) adVideoMap[a.id] = vid;
-  });
+  // 수집
+  const hashes = [];
+  const videoIds = [];
+  const parsed = ads.map(a => {
+    const c = a.creative || {};
+    const oss = c.object_story_spec || {};
+    const afs = c.asset_feed_spec || {};
 
-  const videoThumbMap = {};
-  await Promise.all(
-    [...new Set(Object.values(adVideoMap))].map(async vid => {
-      videoThumbMap[vid] = await getVideoThumbnail(vid, token);
-    })
-  );
-
-  return Object.fromEntries(ads.map(a => {
-    const c = a.creative;
-    const vid = adVideoMap[a.id];
-    const hq =
-      c?.image_url ||
-      c?.object_story_spec?.video_data?.image_url ||
-      (vid ? videoThumbMap[vid] : null) ||
-      c?.thumbnail_url ||
+    const hash =
+      c.image_hash ||
+      oss.link_data?.image_hash ||
+      afs.images?.[0]?.hash ||
       null;
-    return [a.id, hq];
+    const videoId =
+      c.video_id ||
+      oss.video_data?.video_id ||
+      afs.videos?.[0]?.video_id ||
+      null;
+    const directImage =
+      c.image_url ||
+      oss.video_data?.image_url ||
+      oss.link_data?.picture ||
+      afs.images?.[0]?.url ||
+      null;
+
+    if (hash) hashes.push(hash);
+    if (videoId) videoIds.push(videoId);
+    return { adId: a.id, hash, videoId, directImage, thumb: c.thumbnail_url || null };
+  });
+
+  const [hashMap, videoEntries] = await Promise.all([
+    getImageByHash(hashes, cfg),
+    Promise.all([...new Set(videoIds)].map(async id => [id, await getVideoAsset(id, token)])),
+  ]);
+  const videoMap = Object.fromEntries(videoEntries);
+
+  return Object.fromEntries(parsed.map(p => {
+    const v = p.videoId ? videoMap[p.videoId] : null;
+    // 큰 화면용 원본 (해시 원본 > 크리에이티브 이미지 > 비디오 썸네일 > 작은 썸네일)
+    const full =
+      (p.hash && hashMap[p.hash]) ||
+      p.directImage ||
+      v?.thumb ||
+      p.thumb ||
+      null;
+    // 리스트용 (작아도 되지만 이왕이면 원본)
+    const thumb = full || p.thumb || null;
+    return [p.adId, {
+      thumb,
+      full,
+      videoId: p.videoId || null,
+      videoSource: v?.source || null,
+      permalink: v?.permalink || null,
+    }];
   }));
 }
 
@@ -167,7 +234,7 @@ export default async function handler(req, res) {
       getMetaInsights(cfg, 'ad', startDate, endDate),
       getGA4Revenue(cfg, startDate, endDate, ga4Token),
       getGA4RevenueSplit(cfg, startDate, endDate, ga4Token),
-      level === 'ad' ? getMetaThumbnails(cfg) : Promise.resolve({}),
+      level === 'ad' ? getMetaCreatives(cfg) : Promise.resolve({}),
       level === 'adset' ? getAdsetBudgets(cfg) : Promise.resolve({}),
     ]);
 
@@ -184,7 +251,12 @@ export default async function handler(req, res) {
         spend: parseFloat(ad.spend)||0, revenue: ad.revenue,
         roas: calcRoas(ad.revenue, parseFloat(ad.spend)||0),
         reach: parseInt(ad.reach)||0, impressions: parseInt(ad.impressions)||0,
-        clicks: parseInt(ad.inline_link_clicks)||0, thumbnail: thumbnails[ad.ad_id]||null,
+        clicks: parseInt(ad.inline_link_clicks)||0,
+        thumbnail: thumbnails[ad.ad_id]?.thumb || null,
+        fullImage: thumbnails[ad.ad_id]?.full || null,
+        videoSource: thumbnails[ad.ad_id]?.videoSource || null,
+        videoId: thumbnails[ad.ad_id]?.videoId || null,
+        permalink: thumbnails[ad.ad_id]?.permalink || null,
       }));
       return res.json({ data, ...revenueSplit });
     }
