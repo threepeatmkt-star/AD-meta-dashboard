@@ -266,11 +266,12 @@ async function captureAndCopy(ref, filename) {
 // 소재 원본 확대 모달 (이미지 / 영상 재생)
 function CreativeLightbox({ item, onClose, brand }) {
   useEffect(() => {
+    if (!item) return;
     const h = e => { if (e.key === 'Escape') onClose(); };
     document.addEventListener('keydown', h);
     document.body.style.overflow = 'hidden';
     return () => { document.removeEventListener('keydown', h); document.body.style.overflow = ''; };
-  }, [onClose]);
+  }, [item, onClose]);
   if (!item) return null;
   const src = item.fullImage || item.thumbnail;
   return (
