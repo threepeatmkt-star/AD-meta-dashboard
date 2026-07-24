@@ -263,6 +263,105 @@ async function captureAndCopy(ref, filename) {
   });
 }
 
+// 소재 원본 확대 모달 (이미지 / 영상 재생)
+function CreativeLightbox({ item, onClose, brand }) {
+  useEffect(() => {
+    const h = e => { if (e.key === 'Escape') onClose(); };
+    document.addEventListener('keydown', h);
+    document.body.style.overflow = 'hidden';
+    return () => { document.removeEventListener('keydown', h); document.body.style.overflow = ''; };
+  }, [onClose]);
+  if (!item) return null;
+  const src = item.fullImage || item.thumbnail;
+  return (
+    <div className="fixed inset-0 z-[9998] bg-black/80 flex items-center justify-center p-4"
+      onClick={onClose}>
+      <div className="bg-white rounded-2xl overflow-hidden max-w-4xl w-full max-h-[92vh] flex flex-col shadow-2xl"
+        onClick={e => e.stopPropagation()}>
+        <div className="flex items-start justify-between gap-4 px-5 py-4 border-b border-gray-100">
+          <div className="min-w-0">
+            <p className="font-bold text-gray-900 truncate">{item.name}</p>
+            <p className="text-sm text-gray-400 truncate">{item.adsetName} · {item.campaignName}</p>
+          </div>
+          <button onClick={onClose} className="shrink-0 w-9 h-9 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-500 text-lg font-bold">✕</button>
+        </div>
+
+        <div className="flex-1 overflow-auto bg-gray-900 flex items-center justify-center min-h-[300px]">
+          {item.videoSource
+            ? <video src={item.videoSource} poster={src || undefined} controls autoPlay loop
+                className="max-h-[60vh] w-auto max-w-full"/>
+            : src
+              ? <img src={src} alt={item.name} className="max-h-[60vh] w-auto max-w-full object-contain"/>
+              : <div className="text-gray-500 py-20">미리보기를 불러올 수 없습니다</div>
+          }
+        </div>
+
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-px bg-gray-100 border-t border-gray-100">
+          {[
+            ['광고비', krw(item.spend)],
+            ['매출액', krw(item.revenue)],
+            ['ROAS', `${item.roas}%`],
+            ['CTR', ctr(item.clicks, item.impressions)],
+          ].map(([l, v], i) => (
+            <div key={l} className="bg-white px-4 py-3">
+              <p className="text-xs text-gray-400 font-semibold mb-0.5">{l}</p>
+              <p className={`text-base font-bold ${i === 2 ? roasCls(item.roas) : 'text-gray-900'}`}>{v}</p>
+            </div>
+          ))}
+        </div>
+
+        {item.permalink && (
+          <a href={item.permalink} target="_blank" rel="noreferrer"
+            className="px-5 py-3 text-sm font-semibold text-center border-t border-gray-100 hover:bg-gray-50"
+            style={{color: brand.color}}>
+            Meta에서 원본 보기 ↗
+          </a>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// 갤러리 카드
+function CreativeCard({ item, onOpen, brand }) {
+  const src = item.fullImage || item.thumbnail;
+  return (
+    <button onClick={() => onOpen(item)}
+      className="group text-left bg-white rounded-2xl border border-gray-200 overflow-hidden shadow-sm hover:shadow-xl hover:-translate-y-0.5 transition-all">
+      <div className="relative aspect-square bg-gray-100 overflow-hidden">
+        {src
+          ? <img src={src} alt={item.name} loading="lazy"
+              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+              onError={e => { e.target.style.display = 'none'; }}/>
+          : <div className="w-full h-full flex items-center justify-center text-4xl text-gray-300">🖼</div>
+        }
+        {item.videoSource && (
+          <span className="absolute top-2 left-2 px-2 py-0.5 rounded-md bg-black/60 text-white text-xs font-bold">▶ 영상</span>
+        )}
+        <span className={`absolute top-2 right-2 px-2 py-0.5 rounded-md text-xs font-bold text-white ${
+          item.roas >= 300 ? 'bg-blue-600' : item.roas >= 150 ? 'bg-amber-500' : item.roas > 0 ? 'bg-rose-500' : 'bg-gray-400'
+        }`}>
+          ROAS {item.roas}%
+        </span>
+        <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/75 to-transparent px-3 pt-8 pb-2.5">
+          <p className="text-white text-sm font-bold truncate">{item.name}</p>
+          <p className="text-white/60 text-xs truncate">{item.adsetName}</p>
+        </div>
+      </div>
+      <div className="grid grid-cols-2 divide-x divide-gray-100">
+        <div className="px-3 py-2.5">
+          <p className="text-[11px] text-gray-400 font-semibold">광고비</p>
+          <p className="text-sm font-bold text-gray-700 truncate">{krw(item.spend)}</p>
+        </div>
+        <div className="px-3 py-2.5">
+          <p className="text-[11px] text-gray-400 font-semibold">매출액</p>
+          <p className={`text-sm font-bold truncate ${item.revenue > 0 ? 'text-gray-900' : 'text-gray-300'}`}>{krw(item.revenue)}</p>
+        </div>
+      </div>
+    </button>
+  );
+}
+
 export default function Dashboard({ brand }) {
   const router = useRouter();
   const overviewRef = useRef(null);
@@ -287,6 +386,9 @@ export default function Dashboard({ brand }) {
   const [error,setError]=useState('');
   const [lastUpdated,setLastUpdated]=useState(null);
   const [hoverThumb,setHoverThumb]=useState(null);
+  const [adViewMode,setAdViewMode]=useState('list');   // list | gallery
+  const [gallerySort,setGallerySort]=useState('roas');
+  const [lightbox,setLightbox]=useState(null);
 
   const getRange=useCallback(()=>preset==='custom'?[customStart,customEnd]:getPresetRange(preset),[preset,customStart,customEnd]);
 
@@ -338,6 +440,7 @@ export default function Dashboard({ brand }) {
   const productGroupData=adsetSubTab==='product'?groupByProduct(data,brand):[];
   const prevProductGroupData=adsetSubTab==='product'&&compare?groupByProduct(prevData,brand):[];
   const displayData=tab==='adset'&&adsetSubTab==='product'?productGroupData:tab==='ad'?filteredAds:data;
+  const galleryData=[...filteredAds].sort((a,b)=>(b[gallerySort]||0)-(a[gallerySort]||0));
   const dispTotals={...sumRows(displayData)};
   dispTotals.roas=dispTotals.spend>0?Math.round(dispTotals.revenue/dispTotals.spend*1000)/10:0;
 
@@ -358,7 +461,9 @@ export default function Dashboard({ brand }) {
         <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css"/>
       </Head>
 
-      {hoverThumb&&(
+      <CreativeLightbox item={lightbox} onClose={()=>setLightbox(null)} brand={brand}/>
+
+      {hoverThumb&&adViewMode==='list'&&(
         <div className="fixed z-[9999] pointer-events-none" style={{top:Math.max(8,hoverThumb.y-250),left:hoverThumb.x+24}}>
           <img src={hoverThumb.src} className="w-64 h-64 object-cover rounded-2xl shadow-2xl border-2 border-white"/>
         </div>
@@ -504,12 +609,37 @@ export default function Dashboard({ brand }) {
             </div>
           </div>
 
-          {tab==='ad'&&adsetOptions.length>0&&(
-            <div className="px-5 py-3 border-b border-gray-100 bg-gray-50/50 flex items-center gap-3">
-              <span className="text-sm text-gray-500 font-semibold whitespace-nowrap">광고세트 필터:</span>
-              <MultiAdsetSelect options={adsetOptions} selected={selectedAdsets} onChange={setSelectedAdsets}/>
-              {selectedAdsets.length>0&&(
-                <button onClick={()=>setSelectedAdsets([])} className="text-sm text-gray-400 hover:text-gray-600 font-medium">✕ 초기화</button>
+          {tab==='ad'&&(
+            <div className="flex items-center flex-wrap gap-3 px-5 py-3 border-b border-gray-100 bg-gray-50/50">
+              <div className="flex rounded-xl overflow-hidden border border-gray-200 bg-white">
+                {[{v:'list',l:'☰ 리스트'},{v:'gallery',l:'▦ 갤러리'}].map(m=>(
+                  <button key={m.v} onClick={()=>setAdViewMode(m.v)}
+                    className={`px-4 py-2 text-sm font-bold transition-colors ${adViewMode===m.v?'text-white':'text-gray-500 hover:bg-gray-50'}`}
+                    style={adViewMode===m.v?{background:BC}:{}}>
+                    {m.l}
+                  </button>
+                ))}
+              </div>
+              {adsetOptions.length>0&&(
+                <>
+                  <span className="text-sm text-gray-500 font-semibold whitespace-nowrap">광고세트 필터:</span>
+                  <MultiAdsetSelect options={adsetOptions} selected={selectedAdsets} onChange={setSelectedAdsets}/>
+                  {selectedAdsets.length>0&&(
+                    <button onClick={()=>setSelectedAdsets([])} className="text-sm text-gray-400 hover:text-gray-600 font-medium">✕ 초기화</button>
+                  )}
+                </>
+              )}
+              {adViewMode==='gallery'&&(
+                <div className="ml-auto flex items-center gap-2">
+                  <span className="text-sm text-gray-400 font-medium">정렬:</span>
+                  {[{v:'roas',l:'ROAS순'},{v:'revenue',l:'매출액순'},{v:'spend',l:'광고비순'}].map(o=>(
+                    <button key={o.v} onClick={()=>setGallerySort(o.v)}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${gallerySort===o.v?'text-white':'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}
+                      style={gallerySort===o.v?{background:BC}:{}}>
+                      {o.l}
+                    </button>
+                  ))}
+                </div>
               )}
             </div>
           )}
@@ -538,6 +668,18 @@ export default function Dashboard({ brand }) {
             <div className="flex flex-col items-center justify-center h-56 gap-4">
               <Spinner/><p className="text-base text-gray-400">데이터 불러오는 중…</p>
             </div>
+          ):tab==='ad'&&adViewMode==='gallery'?(
+            galleryData.length===0?(
+              <div className="px-5 py-20 text-center">
+                <p className="text-4xl mb-3">📭</p><p className="text-gray-400 text-base">데이터가 없습니다.</p>
+              </div>
+            ):(
+              <div className="p-5 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                {galleryData.map((item,i)=>(
+                  <CreativeCard key={item.id||i} item={item} onOpen={setLightbox} brand={brand}/>
+                ))}
+              </div>
+            )
           ):(
             <div className="overflow-x-auto" ref={tab==='adset'?adsetTableRef:null}>
               {tab==='adset'&&(
@@ -577,7 +719,8 @@ export default function Dashboard({ brand }) {
                         {tab==='ad'&&(
                           <td className="px-5 py-3">
                             {row.thumbnail
-                              ?<div className="w-20 h-20 rounded-xl overflow-hidden border border-gray-200 shadow-sm cursor-zoom-in bg-gray-100 flex-shrink-0">
+                              ?<div onClick={()=>setLightbox(row)}
+                                  className="w-20 h-20 rounded-xl overflow-hidden border border-gray-200 shadow-sm cursor-zoom-in bg-gray-100 flex-shrink-0">
                                   <img src={row.thumbnail} alt="" className="w-full h-full object-cover"
                                     onMouseEnter={e=>setHoverThumb({src:row.thumbnail,x:e.clientX,y:e.clientY})}
                                     onMouseMove={e=>setHoverThumb(p=>p?{...p,x:e.clientX,y:e.clientY}:null)}
