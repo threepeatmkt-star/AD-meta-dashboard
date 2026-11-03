@@ -90,9 +90,10 @@ function groupByProduct(rows, brand) {
   const map={};
   rows.forEach(r=>{
     const prod=normalizeProduct(extractProduct(r.name), brand),key=`${r.campaignName}||${prod}`;
-    if(!map[key]) map[key]={id:key,campaignName:r.campaignName,product:prod,spend:0,revenue:0,reach:0,impressions:0,clicks:0,dailyBudget:0,count:0};
+    if(!map[key]) map[key]={id:key,campaignName:r.campaignName,product:prod,spend:0,revenue:0,reach:0,impressions:0,clicks:0,dailyBudget:0,count:0,adsetNames:[]};
     map[key].spend+=r.spend;map[key].revenue+=r.revenue;map[key].reach+=r.reach;
     map[key].impressions+=r.impressions;map[key].clicks+=r.clicks;map[key].dailyBudget+=r.dailyBudget||0;map[key].count++;
+    if(r.name&&!map[key].adsetNames.includes(r.name)) map[key].adsetNames.push(r.name);
   });
   return Object.values(map)
     .map(g=>({...g,roas:g.spend>0?Math.round(g.revenue/g.spend*1000)/10:0}))
@@ -377,6 +378,7 @@ export default function Dashboard({ brand }) {
   const [tab,setTab]=useState('campaign');
   const [adsetSubTab,setAdsetSubTab]=useState('adset');
   const [selectedAdsets,setSelectedAdsets]=useState([]);
+  const pendingAdsetsRef=useRef(null); // 광고세트 → 소재 탭 이동 시 적용할 필터
   const [data,setData]=useState([]);
   const [prevData,setPrevData]=useState([]);
   const [adRevenue,setAdRevenue]=useState(0);
@@ -412,7 +414,16 @@ export default function Dashboard({ brand }) {
     } catch(e){setError(e.message);} finally{setLoading(false);}
   },[getRange,tab,compare,brand.id]);
 
-  useEffect(()=>{load();setSelectedAdsets([]);},[load]);
+  useEffect(()=>{load();setSelectedAdsets(pendingAdsetsRef.current||[]);pendingAdsetsRef.current=null;},[load]);
+
+  // 광고세트 행 클릭 → 소재 탭으로 이동 + 해당 세트 소재만 필터
+  const goToAds=(adsetNames)=>{
+    if(!adsetNames||!adsetNames.length) return;
+    pendingAdsetsRef.current=adsetNames;
+    setAdViewMode('list');
+    setTab('ad');
+    if(typeof window!=='undefined') window.scrollTo({top:document.getElementById('perf-tabs')?.offsetTop-20||0,behavior:'smooth'});
+  };
 
   const totals={...sumRows(data)};
   totals.roas=totals.spend>0?Math.round((adRevenue+viralRevenue)/totals.spend*1000)/10:0;
@@ -592,7 +603,7 @@ export default function Dashboard({ brand }) {
         </div>
 
         {/* 테이블 */}
-        <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden shadow-sm">
+        <div id="perf-tabs" className="bg-white rounded-2xl border border-gray-200 overflow-hidden shadow-sm">
           <div className="flex items-center border-b border-gray-100 overflow-x-auto">
             {TABS.map(t=>(
               <button key={t.v} onClick={()=>{setTab(t.v);setSelectedAdsets([]);}}
@@ -716,7 +727,10 @@ export default function Dashboard({ brand }) {
                     const showDelta = compare && prev;
 
                     return (
-                      <tr key={i} className="hover:bg-gray-50 transition-colors">
+                      <tr key={i}
+                        onClick={tab==='adset'?()=>goToAds(adsetSubTab==='product'?row.adsetNames:[row.name]):undefined}
+                        title={tab==='adset'?'클릭하면 이 세트의 소재만 보기':undefined}
+                        className={`group transition-colors ${tab==='adset'?'cursor-pointer hover:bg-blue-50':'hover:bg-gray-50'}`}>
                         {tab==='ad'&&(
                           <td className="px-5 py-3">
                             {row.thumbnail
@@ -737,11 +751,12 @@ export default function Dashboard({ brand }) {
                             <div>
                               <p className="text-sm text-gray-400 mb-0.5 font-medium">{row.campaignName}</p>
                               <p className="font-bold text-gray-900 text-base">{row.product}</p>
-                              <p className="text-xs text-gray-300 mt-0.5">{row.count}개 세트</p>
+                              <p className="text-xs text-gray-300 mt-0.5">{row.count}개 세트 <span className="hidden group-hover:inline font-semibold" style={{color:BC}}>· 소재 보기 →</span></p>
                             </div>
                           ):(
                             <div>
                               <p className="font-semibold text-gray-900 truncate max-w-xs text-base" title={row.name}>{row.name}</p>
+                              {tab==='adset'&&<p className="hidden group-hover:block text-xs font-semibold mt-0.5" style={{color:BC}}>소재 보기 →</p>}
                               {tab==='ad'&&row.adsetName&&(
                                 <button onClick={()=>setSelectedAdsets([row.adsetName])}
                                   className="text-sm hover:underline mt-0.5 text-left truncate max-w-xs block font-medium" style={{color:BC}}>
