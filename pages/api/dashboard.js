@@ -209,7 +209,8 @@ async function getGA4RevenueSplit(cfg, startDate, endDate, ga4Token) {
     const sm = r.dimensionValues[0].value.toLowerCase();
     const medium = sm.split(' / ')[1] || '';
     const rev = parseFloat(r.metricValues[0].value) || 0;
-    if (medium.includes('cpm')) adRevenue += rev;
+    // cpm = 수동 UTM, paid = 메타 자동 태그(ig/paid — 상품태그·샵 경유 등) → 둘 다 유료 광고 매출
+    if (medium.includes('cpm') || medium.includes('paid')) adRevenue += rev;
     else viralRevenue += rev;
   });
   return { adRevenue, viralRevenue };
@@ -241,7 +242,9 @@ export default async function handler(req, res) {
     const adWithRevenue = adInsights.map(ad => {
       const revenue = ga4Data.filter(g => g.campaign === ad.campaign_name && g.ad === ad.ad_name).reduce((s,g)=>s+g.revenue,0);
       const fallback = revenue === 0 ? ga4Data.filter(g => g.ad === ad.ad_name && g.ad !== '(not set)').reduce((s,g)=>s+g.revenue,0) : 0;
-      return { ...ad, revenue: revenue || fallback };
+      // 메타 자동 UTM(ig/paid)은 utm_content에 광고 숫자 ID가 찍힘 → 광고 ID로 추가 매핑
+      const idRevenue = ga4Data.filter(g => g.ad === ad.ad_id).reduce((s,g)=>s+g.revenue,0);
+      return { ...ad, revenue: (revenue || fallback) + idRevenue };
     });
 
     if (level === 'ad') {

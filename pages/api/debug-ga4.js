@@ -52,7 +52,7 @@ export default async function handler(req, res) {
       const sm = raw.toLowerCase();
       const medium = sm.split(' / ')[1] || '';
       const rev = parseFloat(r.metricValues[0].value) || 0;
-      const isDA = medium.includes('cpm');
+      const isDA = medium.includes('cpm') || medium.includes('paid');
       if (isDA) daA += rev; else viralA += rev;
       return {
         sourceMedium: raw,
@@ -79,7 +79,7 @@ export default async function handler(req, res) {
       const raw = r.dimensionValues[0].value;
       const medium = raw.toLowerCase().split(' / ')[1] || '';
       const rev = parseFloat(r.metricValues[0].value) || 0;
-      const isDA = medium.includes('cpm');
+      const isDA = medium.includes('cpm') || medium.includes('paid');
       if (isDA) daB += rev; else viralB += rev;
       return {
         sourceMedium: raw,

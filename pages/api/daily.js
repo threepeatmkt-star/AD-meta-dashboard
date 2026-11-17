@@ -79,7 +79,7 @@ export default async function handler(req, res) {
       const d = touch(parseGA4Date(r.dimensionValues[0].value));
       const medium = r.dimensionValues[1].value.toLowerCase().split(' / ')[1] || '';
       const rev = parseFloat(r.metricValues[0].value) || 0;
-      if (medium.includes('cpm')) d.adRevenue += rev; else d.viralRevenue += rev;
+      if (medium.includes('cpm') || medium.includes('paid')) d.adRevenue += rev; else d.viralRevenue += rev;
     });
 
     const daily = Object.values(map)

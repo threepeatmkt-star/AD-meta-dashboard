@@ -79,7 +79,7 @@ export default async function handler(req, res) {
             andGroup: {
               expressions: [
                 { filter: { fieldName: 'sessionSourceMedium', stringFilter: { matchType: 'FULL_REGEXP', value: SNS_REGEX } } },
-                { filter: { fieldName: 'sessionMedium', stringFilter: { matchType: 'CONTAINS', value: 'cpm' } } },
+                { filter: { fieldName: 'sessionMedium', stringFilter: { matchType: 'FULL_REGEXP', value: '.*cpm.*|.*paid.*' } } },
               ],
             },
           },
@@ -87,11 +87,20 @@ export default async function handler(req, res) {
         { headers: { Authorization: `Bearer ${ga4Token}` }, timeout: 30000 }
       );
 
-      const ga4Rows = (ga4.rows || []).map(r => ({
-        date: parseGA4Date(r.dimensionValues[0].value),
-        campaign: r.dimensionValues[1].value,
-        revenue: parseFloat(r.metricValues[0].value) || 0,
-      }));
+      // 메타 자동 UTM(ig/paid)은 utm_campaign에 캠페인 숫자 ID가 찍힘 → 실제 캠페인명으로 변환
+      const campaignList = await fetchMetaPages(`${META_BASE}/act_${cfg.adAccountId}/campaigns`, {
+        fields: 'id,name', limit: 200, access_token: cfg.metaToken,
+      });
+      const campaignNameById = Object.fromEntries(campaignList.map(c => [c.id, c.name]));
+
+      const ga4Rows = (ga4.rows || []).map(r => {
+        const raw = r.dimensionValues[1].value;
+        return {
+          date: parseGA4Date(r.dimensionValues[0].value),
+          campaign: campaignNameById[raw] || raw,
+          revenue: parseFloat(r.metricValues[0].value) || 0,
+        };
+      });
 
       const dailyMap = {};
       ga4Rows.forEach(r => {
@@ -170,7 +179,7 @@ export default async function handler(req, res) {
         sessions: parseInt(r.metricValues[1].value) || 0,
       })).filter(r => {
         const medium = r.sourceMedium.toLowerCase().split(' / ')[1] || '';
-        return !medium.includes('cpm');
+        return !medium.includes('cpm') && !medium.includes('paid');
       });
 
       const dailyMap = {};
