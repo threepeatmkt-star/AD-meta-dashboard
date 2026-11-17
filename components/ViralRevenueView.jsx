@@ -1,7 +1,7 @@
 /**
  * components/ViralRevenueView.jsx — SNS 바이럴 매출 상세 (브랜드 공용)
  */
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
 import {
@@ -70,6 +70,7 @@ export default function ViralRevenueView({ brand }) {
   const [preset, setPreset] = useState('last30');
   const [customStart, setCustomStart] = useState('');
   const [customEnd, setCustomEnd] = useState('');
+  const customEndRef = useRef(null);
   const [useCustom, setUseCustom] = useState(false);
   const [chartType, setChartType] = useState('line');
   const [data, setData] = useState(null);
@@ -177,9 +178,9 @@ export default function ViralRevenueView({ brand }) {
             </button>
             {useCustom && (
               <div className="flex items-center gap-2">
-                <input type="date" value={customStart} onChange={e=>setCustomStart(e.target.value)} className="border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"/>
+                <input type="date" value={customStart} onChange={e=>{setCustomStart(e.target.value);if(e.target.value) requestAnimationFrame(()=>{try{customEndRef.current?.focus();customEndRef.current?.showPicker?.();}catch{}});}} className="border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"/>
                 <span className="text-gray-400">~</span>
-                <input type="date" value={customEnd} onChange={e=>setCustomEnd(e.target.value)} className="border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"/>
+                <input type="date" ref={customEndRef} value={customEnd} min={customStart||undefined} onChange={e=>setCustomEnd(e.target.value)} className="border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"/>
               </div>
             )}
           </div>

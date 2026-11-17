@@ -374,6 +374,21 @@ export default function Dashboard({ brand }) {
   const [preset,setPreset]=useState('today');
   const [customStart,setCustomStart]=useState('');
   const [customEnd,setCustomEnd]=useState('');
+  const customEndRef=useRef(null);
+  const [rangeRestored,setRangeRestored]=useState(false);
+
+  // 선택한 기간을 세션에 저장해 두고, 다른 페이지 갔다 와도 유지
+  useEffect(()=>{
+    try{
+      const s=JSON.parse(sessionStorage.getItem('dash_range')||'null');
+      if(s&&s.preset){setPreset(s.preset);setCustomStart(s.customStart||'');setCustomEnd(s.customEnd||'');}
+    }catch{}
+    setRangeRestored(true);
+  },[]);
+  useEffect(()=>{
+    if(!rangeRestored) return;
+    try{sessionStorage.setItem('dash_range',JSON.stringify({preset,customStart,customEnd}));}catch{}
+  },[rangeRestored,preset,customStart,customEnd]);
   const [compare,setCompare]=useState(false);
   const [tab,setTab]=useState('campaign');
   const [adsetSubTab,setAdsetSubTab]=useState('adset');
@@ -414,7 +429,7 @@ export default function Dashboard({ brand }) {
     } catch(e){setError(e.message);} finally{setLoading(false);}
   },[getRange,tab,compare,brand.id]);
 
-  useEffect(()=>{load();setSelectedAdsets(pendingAdsetsRef.current||[]);pendingAdsetsRef.current=null;},[load]);
+  useEffect(()=>{if(!rangeRestored) return;load();setSelectedAdsets(pendingAdsetsRef.current||[]);pendingAdsetsRef.current=null;},[load,rangeRestored]);
 
   // 광고세트 행 클릭 → 소재 탭으로 이동 + 해당 세트 소재만 필터
   const goToAds=(adsetNames)=>{
@@ -505,6 +520,10 @@ export default function Dashboard({ brand }) {
           </div>
           <div className="flex items-center gap-3">
             {lastUpdated&&<span className="text-sm text-gray-400 hidden lg:inline">업데이트: {lastUpdated}</span>}
+            <button onClick={()=>{const [s,e]=getRange();router.push(`/${brand.id}/decisions${s&&e?`?start=${s}&end=${e}`:''}`);}}
+              className="px-3 py-2.5 border border-gray-200 text-gray-700 rounded-xl text-sm font-bold hover:bg-gray-50 transition-colors whitespace-nowrap">
+              🧭 결정보드
+            </button>
             <button onClick={()=>router.push('/')}
               className="px-3 py-2.5 border border-gray-200 text-gray-500 rounded-xl text-sm font-semibold hover:bg-gray-50 transition-colors whitespace-nowrap">
               🔀 브랜드 변경
@@ -535,9 +554,15 @@ export default function Dashboard({ brand }) {
             ))}
             {preset==='custom'&&(
               <div className="flex items-center gap-2 ml-1">
-                <input type="date" value={customStart} onChange={e=>setCustomStart(e.target.value)} className="border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"/>
+                <input type="date" value={customStart}
+                  onChange={e=>{
+                    setCustomStart(e.target.value);
+                    // 시작일을 고르면 곧바로 종료일 달력이 열리도록
+                    if(e.target.value) requestAnimationFrame(()=>{try{customEndRef.current?.focus();customEndRef.current?.showPicker?.();}catch{}});
+                  }}
+                  className="border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"/>
                 <span className="text-gray-400 font-semibold">~</span>
-                <input type="date" value={customEnd} onChange={e=>setCustomEnd(e.target.value)} className="border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"/>
+                <input type="date" ref={customEndRef} value={customEnd} min={customStart||undefined} onChange={e=>setCustomEnd(e.target.value)} className="border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"/>
               </div>
             )}
             <div className="ml-auto flex items-center gap-3 shrink-0">
