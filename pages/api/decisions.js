@@ -169,14 +169,17 @@ export default async function handler(req, res) {
         errors.push({ k: 'utmNonStd', label: 'UTM 비표준', detail: 'UTM은 있는데 utm_medium이 cpm이 아니에요 — DA 매출 집계 기준(cpm)과 어긋나 분류가 흔들릴 수 있어요' });
       }
       if (ad.spend >= MIN_SPEND && revenue === 0 && ad.pixelRevenue > 0) {
-        errors.push({ k: 'ga4Zero', label: 'GA4 매출 0', detail: `픽셀 매출은 ₩${Math.round(ad.pixelRevenue).toLocaleString('ko-KR')}인데 GA4에선 0원이에요. 점검 순서 — ① 광고관리자에서 이 광고의 '미리보기 → 링크 열기'로 자사몰에 들어간 뒤, 주소창에 utm_source 같은 매개변수가 붙어 있는지 확인 ② 단축링크나 브릿지 페이지를 거치면 UTM이 중간에 사라질 수 있어요 (최종 도착 URL까지 확인) ③ GA4 실시간 보고서를 열어두고 광고 링크로 접속했을 때 유입이 잡히는지 확인 ④ 집행 시작한 지 1~2일 된 소재면 GA4 집계 지연(24~48시간)일 수 있으니 하루 뒤 다시 점검` });
+        errors.push({ k: 'ga4Zero', label: 'GA4 매출 0', detail: `픽셀엔 매출(₩${Math.round(ad.pixelRevenue).toLocaleString('ko-KR')})이 찍히는데 GA4에선 0원이에요. 아래 순서로 점검해주세요.`, steps: [
+          "광고관리자에서 이 광고의 웹사이트 URL을 복사해 새 탭에 붙여넣고 접속해요",
+          "최종 도착한 페이지의 주소창에 utm_source 같은 매개변수가 남아 있는지 확인해요 — 단축링크·기획전 리다이렉트를 거치며 사라졌다면, 광고의 최종 도착 URL에 UTM을 직접 붙여야 해요",
+          "GA4 실시간 보고서를 열어둔 상태로 위 링크로 접속했을 때 유입(세션)이 잡히는지 확인해요 — 안 잡히면 자사몰 GA4 태그 문제예요",
+          "집행 1~2일 차 소재라면 GA4 집계 지연(24~48시간)일 수 있어요 — 하루 뒤 다시 점검해요",
+        ] });
       }
 
       // ── 분류 ──
       const flags = [];
       if (ad.frequency >= 3.5) flags.push({ k: 'fatigue', label: '피로 주의', detail: `빈도 ${ad.frequency.toFixed(1)} — 같은 사람에게 반복 노출 중, 새 소재 준비 추천` });
-      if (ad.spend >= 50000 && pixelRoas > 0 && r > 0 && pixelRoas >= r * 2)
-        flags.push({ k: 'pixelGap', label: '픽셀 과대집계 의심', detail: `픽셀 ${pixelRoas}% vs GA4 ${r}% — 메타가 실제보다 크게 잡고 있을 수 있음` });
 
       let category, reason, options;
       const dropping = roasA != null && roasB != null && roasA > 0 && roasB < roasA * 0.6;

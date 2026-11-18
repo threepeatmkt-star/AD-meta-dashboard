@@ -29,7 +29,7 @@ const rangeDays = (s, e) => Math.round((new Date(e) - new Date(s)) / 86400000) +
 const CATS = {
   off:   { label: 'OFF 검토',    emoji: '🔴', desc: '손익분기 한참 아래 — 쓸수록 손해', color: '#DC2626', soft: '#FEF2F2' },
   fix:   { label: '개선 필요',   emoji: '🟠', desc: '효율이 떨어지는 중이거나 손익분기 근처', color: '#D97706', soft: '#FFFBEB' },
-  scale: { label: '예산증액 검토', emoji: '🟢', desc: '효율 좋고 아직 여유 있음 — 증액 후보', color: '#059669', soft: '#ECFDF5' },
+  scale: { label: '증액 검토', emoji: '🟢', desc: '효율 좋고 아직 여유 있음 — 증액 후보', color: '#059669', soft: '#ECFDF5' },
   keep:  { label: '유지',       emoji: '🔵', desc: '손익분기 위에서 안정적', color: '#2563EB', soft: '#EFF6FF' },
   hold:  { label: '판단 보류',   emoji: '⚪', desc: '광고비가 적어 데이터 부족', color: '#6B7280', soft: '#F9FAFB' },
 };
@@ -85,23 +85,42 @@ function DecisionCard({ item, brand, decision, onDecide, adAccountId }) {
       {open && (
         <div className="px-5 pb-5 border-t border-gray-100 pt-4 bg-gray-50/50">
           {/* 근거 수치 */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
-            {[
-              ['GA4 매출', krw(item.revenue)],
-              ['픽셀 ROAS (참고)', item.pixelRoas + '%'],
-              ['빈도 (1인 평균 노출수)', item.frequency],
-              ['기간 내 추이', item.firstHalf && item.secondHalf
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-4">
+            <div className="rounded-xl bg-white border border-gray-100 px-3 py-2.5">
+              <p className="text-xs text-gray-400">GA4 매출 (UTM+광고ID 매핑)</p>
+              <p className="text-base font-bold text-gray-900 mt-0.5">{krw(item.revenue)}</p>
+            </div>
+            <div className="rounded-xl bg-white border border-gray-100 px-3 py-2.5 overflow-visible">
+              <p className="text-xs text-gray-400 flex items-center gap-1.5">빈도
+                <span className="relative group cursor-help inline-flex items-center justify-center w-4 h-4 rounded-full bg-gray-300 text-white text-[10px] font-bold leading-none">i
+                  <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block w-64 bg-gray-900 text-white text-xs font-medium rounded-xl px-3.5 py-3 leading-relaxed z-30 shadow-xl whitespace-normal">
+                    이 기간에 한 사람이 이 광고를 평균 몇 번 봤는지예요. 3.5를 넘으면 볼 사람은 이미 다 봤다는 신호 — 효율이 떨어지기 전에 새 소재 교체를 준비할 타이밍이에요.
+                  </span>
+                </span>
+              </p>
+              <p className="text-base font-bold text-gray-900 mt-0.5">{item.frequency}</p>
+            </div>
+            <div className="rounded-xl bg-white border border-gray-100 px-3 py-2.5 col-span-2 sm:col-span-1">
+              <p className="text-xs text-gray-400">기간 내 추이</p>
+              <p className="text-base font-bold text-gray-900 mt-0.5">{item.firstHalf && item.secondHalf
                 ? `${item.firstHalf.roas}% → ${item.secondHalf.roas}% ${item.secondHalf.roas < item.firstHalf.roas ? '▼' : '▲'}`
-                : '—'],
-            ].map(([k, v]) => (
-              <div key={k} className="rounded-xl bg-white border border-gray-100 px-3 py-2.5">
-                <p className="text-xs text-gray-400">{k}</p>
-                <p className="text-base font-bold text-gray-900 mt-0.5">{v}</p>
-              </div>
-            ))}
+                : '—'}</p>
+            </div>
           </div>
           {item.errors.map(f => (
-            <p key={f.k} className="text-sm text-red-700 bg-red-50 border border-red-100 rounded-xl px-4 py-3 mb-2 leading-relaxed">🚨 <b>{f.label}</b> — {f.detail}</p>
+            <div key={f.k} className="text-sm text-red-700 bg-red-50 border border-red-100 rounded-xl px-4 py-3 mb-2 leading-relaxed">
+              <p>🚨 <b>{f.label}</b> — {f.detail}</p>
+              {f.steps && (
+                <ol className="mt-2.5 space-y-2">
+                  {f.steps.map((st, i) => (
+                    <li key={i} className="flex gap-2.5">
+                      <span className="shrink-0 w-5 h-5 rounded-full bg-red-600 text-white text-[11px] font-bold flex items-center justify-center mt-0.5">{i + 1}</span>
+                      <span>{st}</span>
+                    </li>
+                  ))}
+                </ol>
+              )}
+            </div>
           ))}
           {item.flags.map(f => (
             <p key={f.k} className="text-sm text-amber-700 bg-amber-50 border border-amber-100 rounded-xl px-4 py-3 mb-2 leading-relaxed">⚠ <b>{f.label}</b> — {f.detail}</p>
@@ -340,7 +359,19 @@ export default function DecisionBoard({ brand }) {
                     )}
                   </div>
                   {i.errors.map(f => (
-                    <p key={f.k} className="text-sm text-red-700 mt-1.5 leading-relaxed">🚨 <b>{f.label}</b> — {f.detail}</p>
+                    <div key={f.k} className="text-sm text-red-700 mt-2 leading-relaxed bg-red-50 border border-red-100 rounded-xl px-4 py-3">
+                      <p>🚨 <b>{f.label}</b> — {f.detail}</p>
+                      {f.steps && (
+                        <ol className="mt-2.5 space-y-2">
+                          {f.steps.map((st, si) => (
+                            <li key={si} className="flex gap-2.5">
+                              <span className="shrink-0 w-5 h-5 rounded-full bg-red-600 text-white text-[11px] font-bold flex items-center justify-center mt-0.5">{si + 1}</span>
+                              <span>{st}</span>
+                            </li>
+                          ))}
+                        </ol>
+                      )}
+                    </div>
                   ))}
                 </div>
               ))}
@@ -378,6 +409,13 @@ export default function DecisionBoard({ brand }) {
           결정 기록은 이 브라우저에 저장됩니다 · 분류 기준: 손익분기 {data?.breakeven || '—'}% 대비 (lib/brands.js에서 수정) · 클릭 시 메타 자동 반영은 추후 추가 예정
         </p>
       </main>
+
+      {/* 맨 위로 */}
+      <button onClick={() => typeof window !== 'undefined' && window.scrollTo({ top: 0, behavior: 'smooth' })}
+        aria-label="맨 위로"
+        className="fixed bottom-6 right-6 z-40 w-12 h-12 rounded-full bg-gray-900 text-white text-xl shadow-xl hover:bg-gray-700 transition-colors flex items-center justify-center">
+        △
+      </button>
     </div>
   );
 }

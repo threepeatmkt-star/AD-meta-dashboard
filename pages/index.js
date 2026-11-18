@@ -135,7 +135,7 @@ function BrandPicker() {
                 </span>
                 <button onClick={e => { e.stopPropagation(); router.push(`/${b.id}/decisions`); }}
                   className="inline-flex items-center gap-2 px-5 py-3 rounded-xl text-white text-base font-bold shadow-sm hover:opacity-90 transition-opacity"
-                  style={{background:'linear-gradient(135deg,#F59E0B,#F97316)'}}>
+                  style={{background:'linear-gradient(135deg,#FDE047,#F59E0B)'}}>
                   🩺 광고 진단
                 </button>
               </div>
@@ -143,15 +143,26 @@ function BrandPicker() {
           ))}
         </div>
 
-        <button onClick={() => router.push('/all')}
-          className="mt-10 px-8 py-5 bg-white border-2 border-gray-200 rounded-2xl text-center max-w-md w-full shadow-sm hover:shadow-lg hover:border-gray-900 transition-all group">
-          <p className="text-base font-bold text-gray-900">
-            🔗 통합 조회 <span className="text-gray-400 font-medium">(삼대오백 + 엠엑시브)</span>
-          </p>
-          <p className="text-xs text-gray-400 mt-1 group-hover:text-gray-600 transition-colors">
-            전사 합계 · 브랜드 비교 · 통합 테이블 →
-          </p>
-        </button>
+        <div className="mt-10 flex flex-col sm:flex-row gap-4 w-full max-w-2xl">
+          <button onClick={() => router.push('/all')}
+            className="flex-1 px-8 py-5 bg-white border-2 border-gray-200 rounded-2xl text-center shadow-sm hover:shadow-lg hover:border-gray-900 transition-all group">
+            <p className="text-base font-bold text-gray-900">
+              🔗 통합 조회 <span className="text-gray-400 font-medium">(삼대오백 + 엠엑시브)</span>
+            </p>
+            <p className="text-xs text-gray-400 mt-1 group-hover:text-gray-600 transition-colors">
+              전사 합계 · 브랜드 비교 · 통합 테이블 →
+            </p>
+          </button>
+          <button onClick={() => router.push('/setup-check')}
+            className="flex-1 px-8 py-5 bg-white border-2 border-gray-200 rounded-2xl text-center shadow-sm hover:shadow-lg hover:border-emerald-600 transition-all group">
+            <p className="text-base font-bold text-gray-900">
+              🧪 환경 진단 <span className="text-gray-400 font-medium">(픽셀·GA4 점검)</span>
+            </p>
+            <p className="text-xs text-gray-400 mt-1 group-hover:text-gray-600 transition-colors">
+              픽셀·GA4 설치 상태 · 과집계 진단 →
+            </p>
+          </button>
+        </div>
       </main>
     </div>
   );
