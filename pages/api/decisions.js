@@ -169,7 +169,7 @@ export default async function handler(req, res) {
         errors.push({ k: 'utmNonStd', label: 'UTM 비표준', detail: 'UTM은 있는데 utm_medium이 cpm이 아니에요 — DA 매출 집계 기준(cpm)과 어긋나 분류가 흔들릴 수 있어요' });
       }
       if (ad.spend >= MIN_SPEND && revenue === 0 && ad.pixelRevenue > 0) {
-        errors.push({ k: 'ga4Zero', label: 'GA4 매출 0', detail: `픽셀 매출은 ₩${Math.round(ad.pixelRevenue).toLocaleString('ko-KR')}인데 GA4에선 0원 — UTM 또는 GA4 추적 연결을 확인해주세요` });
+        errors.push({ k: 'ga4Zero', label: 'GA4 매출 0', detail: `픽셀 매출은 ₩${Math.round(ad.pixelRevenue).toLocaleString('ko-KR')}인데 GA4에선 0원이에요. 점검 순서 — ① 광고관리자에서 이 광고의 '미리보기 → 링크 열기'로 자사몰에 들어간 뒤, 주소창에 utm_source 같은 매개변수가 붙어 있는지 확인 ② 단축링크나 브릿지 페이지를 거치면 UTM이 중간에 사라질 수 있어요 (최종 도착 URL까지 확인) ③ GA4 실시간 보고서를 열어두고 광고 링크로 접속했을 때 유입이 잡히는지 확인 ④ 집행 시작한 지 1~2일 된 소재면 GA4 집계 지연(24~48시간)일 수 있으니 하루 뒤 다시 점검` });
       }
 
       // ── 분류 ──
@@ -220,7 +220,7 @@ export default async function handler(req, res) {
     const totalRevenue = items.reduce((s, i) => s + i.revenue, 0);
 
     res.json({
-      brand: cfg.brandId, breakeven,
+      brand: cfg.brandId, breakeven, adAccountId: cfg.adAccountId,
       period: { start: startDate, end: endDate, firstHalf: half.split ? half.a : null, secondHalf: half.split ? half.b : null },
       summary: {
         totalSpend, totalRevenue, totalRoas: roas(totalRevenue, totalSpend),

@@ -1,5 +1,5 @@
 /**
- * components/DecisionBoard.jsx — 주간 점검 (구 결정보드)
+ * components/DecisionBoard.jsx — 광고 진단 (구 결정보드)
  * 소재별 자동 점검 → 설정 오류 / 끄기 검토 / 손보기 / 늘리기 분류 → 결정만 누르면 기록.
  * 결정 기록은 브라우저(localStorage)에 저장됩니다. (자동 반영은 추후)
  */
@@ -8,7 +8,9 @@ import { useRouter } from 'next/router';
 import Head from 'next/head';
 import { BRAND_LIST } from '../lib/brands';
 
-const BOARD_NAME = '주간 점검';
+const BOARD_NAME = '광고 진단';
+const adsManagerUrl = (accountId, adId) =>
+  `https://adsmanager.facebook.com/adsmanager/manage/ads/edit?act=${accountId}&selected_ad_ids=${adId}`;
 const krw = v => '₩' + Math.round(v || 0).toLocaleString('ko-KR');
 const man = v => `${(Math.round((v || 0) / 1000) / 10).toLocaleString('ko-KR')}만원`;
 
@@ -25,11 +27,11 @@ function getPresetRange(preset) {
 const rangeDays = (s, e) => Math.round((new Date(e) - new Date(s)) / 86400000) + 1;
 
 const CATS = {
-  off:   { label: '끄기 검토', emoji: '🔴', desc: '손익분기 한참 아래 — 쓸수록 손해', color: '#DC2626', soft: '#FEF2F2' },
-  fix:   { label: '손보기',   emoji: '🟠', desc: '효율이 떨어지는 중이거나 손익분기 근처', color: '#D97706', soft: '#FFFBEB' },
-  scale: { label: '늘리기',   emoji: '🟢', desc: '효율 좋고 아직 여유 있음 — 증액 후보', color: '#059669', soft: '#ECFDF5' },
-  keep:  { label: '유지',     emoji: '🔵', desc: '손익분기 위에서 안정적', color: '#2563EB', soft: '#EFF6FF' },
-  hold:  { label: '판단 보류', emoji: '⚪', desc: '광고비가 적어 데이터 부족', color: '#6B7280', soft: '#F9FAFB' },
+  off:   { label: 'OFF 검토',    emoji: '🔴', desc: '손익분기 한참 아래 — 쓸수록 손해', color: '#DC2626', soft: '#FEF2F2' },
+  fix:   { label: '개선 필요',   emoji: '🟠', desc: '효율이 떨어지는 중이거나 손익분기 근처', color: '#D97706', soft: '#FFFBEB' },
+  scale: { label: '예산증액 검토', emoji: '🟢', desc: '효율 좋고 아직 여유 있음 — 증액 후보', color: '#059669', soft: '#ECFDF5' },
+  keep:  { label: '유지',       emoji: '🔵', desc: '손익분기 위에서 안정적', color: '#2563EB', soft: '#EFF6FF' },
+  hold:  { label: '판단 보류',   emoji: '⚪', desc: '광고비가 적어 데이터 부족', color: '#6B7280', soft: '#F9FAFB' },
 };
 const CAT_ORDER = ['off', 'fix', 'scale', 'keep', 'hold'];
 
@@ -37,14 +39,14 @@ const CAT_ORDER = ['off', 'fix', 'scale', 'keep', 'hold'];
 function AdPath({ item, size = 'md' }) {
   return (
     <div className={`flex items-center flex-wrap gap-x-1.5 gap-y-1 ${size === 'md' ? 'mb-1.5' : ''}`}>
-      <span className="px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 text-xs font-bold whitespace-nowrap">📊 {item.campaignName}</span>
-      <span className="text-gray-300 text-xs">›</span>
-      <span className="px-2 py-0.5 rounded-md bg-sky-50 text-sky-700 text-xs font-bold whitespace-nowrap">🎯 {item.adsetName}</span>
+      <span className="px-2.5 py-1 rounded-md bg-indigo-50 text-indigo-700 text-sm font-bold whitespace-nowrap">📊 {item.campaignName}</span>
+      <span className="text-gray-300 text-sm">›</span>
+      <span className="px-2.5 py-1 rounded-md bg-sky-50 text-sky-700 text-sm font-bold whitespace-nowrap">🎯 {item.adsetName}</span>
     </div>
   );
 }
 
-function DecisionCard({ item, brand, decision, onDecide }) {
+function DecisionCard({ item, brand, decision, onDecide, adAccountId }) {
   const [open, setOpen] = useState(false);
   const [memo, setMemo] = useState(decision?.memo || '');
   const cat = CATS[item.category];
@@ -87,7 +89,7 @@ function DecisionCard({ item, brand, decision, onDecide }) {
             {[
               ['GA4 매출', krw(item.revenue)],
               ['픽셀 ROAS (참고)', item.pixelRoas + '%'],
-              ['빈도', item.frequency],
+              ['빈도 (1인 평균 노출수)', item.frequency],
               ['기간 내 추이', item.firstHalf && item.secondHalf
                 ? `${item.firstHalf.roas}% → ${item.secondHalf.roas}% ${item.secondHalf.roas < item.firstHalf.roas ? '▼' : '▲'}`
                 : '—'],
@@ -121,6 +123,12 @@ function DecisionCard({ item, brand, decision, onDecide }) {
                 결정 취소
               </button>
             )}
+            {adAccountId && (
+              <a href={adsManagerUrl(adAccountId, item.adId)} target="_blank" rel="noreferrer"
+                className="ml-auto px-4 py-2.5 rounded-xl text-sm font-bold border-2 border-gray-200 text-gray-600 hover:border-gray-400 bg-white">
+                광고관리자에서 열기 ↗
+              </a>
+            )}
           </div>
           <input value={memo} onChange={e => setMemo(e.target.value)}
             onBlur={() => decision && onDecide(item.adId, { ...decision, memo })}
@@ -142,6 +150,7 @@ export default function DecisionBoard({ brand }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [decisions, setDecisions] = useState({});
+  const [q, setQ] = useState('');
   const loadedQuery = useRef(false);
 
   useEffect(() => {
@@ -190,7 +199,10 @@ export default function DecisionBoard({ brand }) {
   const BC = brand.color;
   const [rangeStart, rangeEnd] = getRange();
   const items = data?.items || [];
-  const errorItems = items.filter(i => i.errors.length > 0);
+  const qq = q.trim().toLowerCase();
+  const matchQ = i => !qq || [i.adName, i.adsetName, i.campaignName].some(s => s && s.toLowerCase().includes(qq));
+  const errorItems = items.filter(i => i.errors.length > 0).filter(matchQ);
+  const scrollTo = id => { if (typeof document !== 'undefined') document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' }); };
   const undecided = items.filter(i => !decisions[i.adId] && (i.category === 'off' || i.category === 'fix' || i.category === 'scale'));
   const decidedCount = items.filter(i => decisions[i.adId]).length;
 
@@ -245,7 +257,11 @@ export default function DecisionBoard({ brand }) {
             </button>
           ))}
           <p className="text-sm text-gray-400 ml-1">📅 {rangeStart} ~ {rangeEnd}{custom ? ' (대시보드 기간)' : ''}</p>
-          {data && <p className="ml-auto text-sm text-gray-500">손익분기 ROAS <b className="text-gray-800">{data.breakeven}%</b> (ERP 원가 기준)</p>}
+          <div className="ml-auto flex items-center gap-3">
+            <input value={q} onChange={e => setQ(e.target.value)} placeholder="🔍 캠페인·광고세트·소재 검색"
+              className="border border-gray-200 rounded-xl px-4 py-2 text-sm w-56 focus:outline-none focus:ring-2 focus:ring-amber-300"/>
+            {data && <p className="text-sm text-gray-500 whitespace-nowrap hidden md:block">손익분기 ROAS <b className="text-gray-800">{data.breakeven}%</b> (ERP 원가 기준)</p>}
+          </div>
         </div>
         {shortNote && (
           <div className="max-w-screen-xl mx-auto px-6 pb-3">
@@ -262,15 +278,17 @@ export default function DecisionBoard({ brand }) {
         {/* 요약 타일 */}
         {data && (
           <div className="grid grid-cols-3 sm:grid-cols-6 gap-3 mb-6">
-            <div className="rounded-2xl bg-white border-2 border-red-200 px-4 py-3 text-center">
+            <button onClick={() => scrollTo('sec-errors')}
+              className="rounded-2xl bg-white border-2 border-red-200 px-4 py-3 text-center hover:shadow-md hover:-translate-y-0.5 transition-all">
               <p className="text-2xl font-extrabold text-red-600">{data.summary.errorAds || 0}</p>
               <p className="text-xs font-bold text-gray-500 mt-0.5">🚨 설정 오류</p>
-            </div>
+            </button>
             {CAT_ORDER.map(c => (
-              <div key={c} className="rounded-2xl bg-white border border-gray-200 px-4 py-3 text-center">
+              <button key={c} onClick={() => scrollTo(`sec-${c}`)}
+                className="rounded-2xl bg-white border border-gray-200 px-4 py-3 text-center hover:shadow-md hover:-translate-y-0.5 transition-all">
                 <p className="text-2xl font-extrabold" style={{ color: CATS[c].color }}>{data.summary.counts[c] || 0}</p>
                 <p className="text-xs font-bold text-gray-500 mt-0.5">{CATS[c].emoji} {CATS[c].label}</p>
-              </div>
+              </button>
             ))}
           </div>
         )}
@@ -301,7 +319,7 @@ export default function DecisionBoard({ brand }) {
 
         {/* 설정 오류 점검 */}
         {errorItems.length > 0 && (
-          <section className="mb-8">
+          <section id="sec-errors" className="mb-8 scroll-mt-32">
             <div className="flex items-center gap-2 mb-3">
               <span className="px-3.5 py-1.5 rounded-full text-base font-extrabold text-white bg-red-600">🚨 설정 오류 {errorItems.length}</span>
               <p className="text-sm text-gray-400">UTM 누락·비표준, GA4 추적 불일치 — 숫자가 새는 원인부터 고쳐요</p>
@@ -309,8 +327,18 @@ export default function DecisionBoard({ brand }) {
             <div className="space-y-2">
               {errorItems.map(i => (
                 <div key={i.adId} className="rounded-2xl bg-white border border-red-200 px-5 py-3.5">
-                  <AdPath item={i} size="sm"/>
-                  <p className="text-base font-extrabold text-gray-900 mt-1">🖼 {i.adName}</p>
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <AdPath item={i} size="sm"/>
+                      <p className="text-base font-extrabold text-gray-900 mt-1">🖼 {i.adName}</p>
+                    </div>
+                    {data?.adAccountId && (
+                      <a href={adsManagerUrl(data.adAccountId, i.adId)} target="_blank" rel="noreferrer"
+                        className="shrink-0 px-4 py-2 rounded-xl text-sm font-bold border-2 border-gray-200 text-gray-600 hover:border-gray-400 bg-white whitespace-nowrap">
+                        광고관리자 ↗
+                      </a>
+                    )}
+                  </div>
                   {i.errors.map(f => (
                     <p key={f.k} className="text-sm text-red-700 mt-1.5 leading-relaxed">🚨 <b>{f.label}</b> — {f.detail}</p>
                   ))}
@@ -322,23 +350,27 @@ export default function DecisionBoard({ brand }) {
 
         {/* 분류별 카드 */}
         {CAT_ORDER.map(cat => {
-          const group = items.filter(i => i.category === cat);
+          const group = items.filter(i => i.category === cat).filter(matchQ);
           if (!group.length) return null;
           const c = CATS[cat];
           return (
-            <section key={cat} className="mb-8">
+            <section key={cat} id={`sec-${cat}`} className="mb-8 scroll-mt-32">
               <div className="flex items-center gap-2 mb-3">
                 <span className="px-3.5 py-1.5 rounded-full text-base font-extrabold text-white" style={{ background: c.color }}>{c.emoji} {c.label} {group.length}</span>
                 <p className="text-sm text-gray-400">{c.desc}</p>
               </div>
               <div className="space-y-3">
                 {group.map(item => (
-                  <DecisionCard key={item.adId} item={item} brand={brand} decision={decisions[item.adId]} onDecide={onDecide}/>
+                  <DecisionCard key={item.adId} item={item} brand={brand} decision={decisions[item.adId]} onDecide={onDecide} adAccountId={data?.adAccountId}/>
                 ))}
               </div>
             </section>
           );
         })}
+
+        {qq && items.filter(matchQ).length === 0 && (
+          <p className="text-center text-gray-400 py-16">"{q}" 검색 결과가 없어요</p>
+        )}
 
         {!data && loading && <p className="text-center text-gray-400 py-20 text-base">소재를 점검하는 중이에요… (20~30초 걸릴 수 있어요)</p>}
 

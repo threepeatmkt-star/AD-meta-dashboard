@@ -134,8 +134,9 @@ function BrandPicker() {
                   대시보드 열기 <span>→</span>
                 </span>
                 <button onClick={e => { e.stopPropagation(); router.push(`/${b.id}/decisions`); }}
-                  className="inline-flex items-center gap-2 px-5 py-3 rounded-xl text-base font-bold border-2 border-gray-200 text-gray-700 hover:border-gray-900 hover:bg-gray-50 transition-all">
-                  🩺 주간 점검
+                  className="inline-flex items-center gap-2 px-5 py-3 rounded-xl text-white text-base font-bold shadow-sm hover:opacity-90 transition-opacity"
+                  style={{background:'linear-gradient(135deg,#F59E0B,#F97316)'}}>
+                  🩺 광고 진단
                 </button>
               </div>
             </div>

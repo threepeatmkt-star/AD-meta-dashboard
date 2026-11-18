@@ -521,8 +521,9 @@ export default function Dashboard({ brand }) {
           <div className="flex items-center gap-3">
             {lastUpdated&&<span className="text-sm text-gray-400 hidden lg:inline">업데이트: {lastUpdated}</span>}
             <button onClick={()=>{const [s,e]=getRange();router.push(`/${brand.id}/decisions${s&&e?`?start=${s}&end=${e}`:''}`);}}
-              className="px-3 py-2.5 border border-gray-200 text-gray-700 rounded-xl text-sm font-bold hover:bg-gray-50 transition-colors whitespace-nowrap">
-              🩺 주간 점검
+              className="px-4 py-2.5 text-white rounded-xl text-sm font-bold shadow-sm hover:opacity-90 transition-opacity whitespace-nowrap"
+              style={{background:'linear-gradient(135deg,#F59E0B,#F97316)'}}>
+              🩺 광고 진단
             </button>
             <button onClick={()=>router.push('/')}
               className="px-3 py-2.5 border border-gray-200 text-gray-500 rounded-xl text-sm font-semibold hover:bg-gray-50 transition-colors whitespace-nowrap">
