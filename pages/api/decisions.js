@@ -57,6 +57,28 @@ async function getMetaAds(cfg, startDate, endDate) {
   });
 }
 
+// 소재별 랜딩 URL·URL 매개변수 — UTM 설정 점검용
+async function getAdTags(cfg) {
+  try {
+    const rows = await fetchMetaPages(`${META_BASE}/act_${cfg.adAccountId}/ads`, {
+      fields: 'id,creative{url_tags,object_story_spec{link_data{link},video_data{call_to_action}},asset_feed_spec{link_urls}}',
+      filtering: JSON.stringify([{ field: 'effective_status', operator: 'IN', value: ['ACTIVE'] }]),
+      limit: 200, access_token: cfg.metaToken,
+    });
+    return Object.fromEntries(rows.map(r => {
+      const c = r.creative || {};
+      const oss = c.object_story_spec || {};
+      const parts = [
+        c.url_tags || '',
+        oss.link_data?.link || '',
+        oss.video_data?.call_to_action?.value?.link || '',
+        ...((c.asset_feed_spec?.link_urls || []).map(l => l.website_url || '')),
+      ];
+      return [r.id, parts.join(' ')];
+    }));
+  } catch { return {}; }
+}
+
 // GA4 매출 (캠페인+콘텐츠 차원) — 대시보드와 같은 매칭 규칙
 async function getGA4Rows(cfg, startDate, endDate, ga4Token) {
   const { data } = await axios.post(
@@ -114,13 +136,14 @@ export default async function handler(req, res) {
     const ga4Token = await getGA4AccessToken();
     const half = splitRange(startDate, endDate);
 
-    const [adsFull, adsA, adsB, ga4Full, ga4A, ga4B] = await Promise.all([
+    const [adsFull, adsA, adsB, ga4Full, ga4A, ga4B, adTags] = await Promise.all([
       getMetaAds(cfg, startDate, endDate),
       half.split ? getMetaAds(cfg, half.a[0], half.a[1]) : Promise.resolve([]),
       half.split ? getMetaAds(cfg, half.b[0], half.b[1]) : Promise.resolve([]),
       getGA4Rows(cfg, startDate, endDate, ga4Token),
       half.split ? getGA4Rows(cfg, half.a[0], half.a[1], ga4Token) : Promise.resolve([]),
       half.split ? getGA4Rows(cfg, half.b[0], half.b[1], ga4Token) : Promise.resolve([]),
+      getAdTags(cfg),
     ]);
 
     const mapById = rows => Object.fromEntries(rows.map(r => [r.adId, r]));
@@ -136,6 +159,18 @@ export default async function handler(req, res) {
       const revB = adB ? matchRevenue(ga4B, { ...ad, ...adB }) : 0;
       const roasA = adA ? roas(revA, adA.spend) : null;
       const roasB = adB ? roas(revB, adB.spend) : null;
+
+      // ── 설정 오류 점검 ──
+      const tagStr = adTags[ad.adId] ?? '';
+      const errors = [];
+      if (tagStr && !/utm_/i.test(tagStr)) {
+        errors.push({ k: 'noUtm', label: 'UTM 없음', detail: '랜딩 URL과 URL 매개변수 어디에도 UTM이 없어요 — 이 소재의 매출은 메타 자동 태그(ig/paid)나 바이럴로 흘러갑니다. 표준 UTM 템플릿을 넣어주세요 (기존 광고 URL 수정은 머신러닝 초기화 주의 → 신규 소재부터 적용 추천)' });
+      } else if (tagStr && /utm_/i.test(tagStr) && !/utm_medium=cpm/i.test(tagStr)) {
+        errors.push({ k: 'utmNonStd', label: 'UTM 비표준', detail: 'UTM은 있는데 utm_medium이 cpm이 아니에요 — DA 매출 집계 기준(cpm)과 어긋나 분류가 흔들릴 수 있어요' });
+      }
+      if (ad.spend >= MIN_SPEND && revenue === 0 && ad.pixelRevenue > 0) {
+        errors.push({ k: 'ga4Zero', label: 'GA4 매출 0', detail: `픽셀 매출은 ₩${Math.round(ad.pixelRevenue).toLocaleString('ko-KR')}인데 GA4에선 0원 — UTM 또는 GA4 추적 연결을 확인해주세요` });
+      }
 
       // ── 분류 ──
       const flags = [];
@@ -176,7 +211,7 @@ export default async function handler(req, res) {
         pixelRoas, frequency: Math.round(ad.frequency * 10) / 10,
         firstHalf: roasA != null ? { range: half.a, roas: roasA, spend: Math.round(adA.spend) } : null,
         secondHalf: roasB != null ? { range: half.b, roas: roasB, spend: Math.round(adB.spend) } : null,
-        category, reason, options, flags,
+        category, reason, options, flags, errors,
       };
     }).sort((x, y) => y.spend - x.spend);
 
@@ -192,6 +227,7 @@ export default async function handler(req, res) {
         counts: { off: count('off'), fix: count('fix'), scale: count('scale'), keep: count('keep'), hold: count('hold') },
         belowBreakeven: items.filter(i => i.spend >= MIN_SPEND && i.roas < breakeven).length,
         activeAds: items.length,
+        errorAds: items.filter(i => i.errors.length > 0).length,
       },
       items,
     });

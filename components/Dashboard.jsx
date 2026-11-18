@@ -522,7 +522,7 @@ export default function Dashboard({ brand }) {
             {lastUpdated&&<span className="text-sm text-gray-400 hidden lg:inline">업데이트: {lastUpdated}</span>}
             <button onClick={()=>{const [s,e]=getRange();router.push(`/${brand.id}/decisions${s&&e?`?start=${s}&end=${e}`:''}`);}}
               className="px-3 py-2.5 border border-gray-200 text-gray-700 rounded-xl text-sm font-bold hover:bg-gray-50 transition-colors whitespace-nowrap">
-              🧭 결정보드
+              🩺 주간 점검
             </button>
             <button onClick={()=>router.push('/')}
               className="px-3 py-2.5 border border-gray-200 text-gray-500 rounded-xl text-sm font-semibold hover:bg-gray-50 transition-colors whitespace-nowrap">

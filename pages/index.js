@@ -111,8 +111,9 @@ function BrandPicker() {
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 w-full max-w-4xl">
           {BRAND_LIST.map(b => (
-            <button key={b.id} onClick={() => router.push(`/${b.id}`)}
-              className="group relative bg-white rounded-3xl border-2 border-gray-200 p-10 text-left shadow-sm hover:shadow-2xl hover:-translate-y-1 transition-all duration-200"
+            <div key={b.id} role="button" tabIndex={0} onClick={() => router.push(`/${b.id}`)}
+              onKeyDown={e => { if (e.key === 'Enter') router.push(`/${b.id}`); }}
+              className="group relative bg-white rounded-3xl border-2 border-gray-200 p-10 text-left shadow-sm hover:shadow-2xl hover:-translate-y-1 transition-all duration-200 cursor-pointer"
               style={{ borderColor: 'transparent' }}
               onMouseEnter={e => { e.currentTarget.style.borderColor = '#111827'; }}
               onMouseLeave={e => { e.currentTarget.style.borderColor = 'transparent'; }}>
@@ -128,10 +129,16 @@ function BrandPicker() {
               </div>
               <p className="text-gray-500 text-base mb-1">{b.desc}</p>
               <p className="text-gray-300 text-sm">{b.site}</p>
-              <div className="mt-7 inline-flex items-center gap-2 px-5 py-3 rounded-xl text-white text-base font-bold shadow-sm group-hover:gap-3 transition-all bg-gray-900">
-                대시보드 열기 <span>→</span>
+              <div className="mt-7 flex items-center gap-3 flex-wrap">
+                <span className="inline-flex items-center gap-2 px-5 py-3 rounded-xl text-white text-base font-bold shadow-sm group-hover:gap-3 transition-all bg-gray-900">
+                  대시보드 열기 <span>→</span>
+                </span>
+                <button onClick={e => { e.stopPropagation(); router.push(`/${b.id}/decisions`); }}
+                  className="inline-flex items-center gap-2 px-5 py-3 rounded-xl text-base font-bold border-2 border-gray-200 text-gray-700 hover:border-gray-900 hover:bg-gray-50 transition-all">
+                  🩺 주간 점검
+                </button>
               </div>
-            </button>
+            </div>
           ))}
         </div>
 
