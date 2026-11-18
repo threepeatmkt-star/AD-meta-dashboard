@@ -135,7 +135,7 @@ function BrandPicker() {
                 </span>
                 <button onClick={e => { e.stopPropagation(); router.push(`/${b.id}/decisions`); }}
                   className="inline-flex items-center gap-2 px-5 py-3 rounded-xl text-white text-base font-bold shadow-sm hover:opacity-90 transition-opacity"
-                  style={{background:'linear-gradient(135deg,#FDE047,#F59E0B)'}}>
+                  style={{background:'linear-gradient(135deg,#F97316,#EF4444)'}}>
                   🩺 광고 진단
                 </button>
               </div>

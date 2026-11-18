@@ -522,7 +522,7 @@ export default function Dashboard({ brand }) {
             {lastUpdated&&<span className="text-sm text-gray-400 hidden lg:inline">업데이트: {lastUpdated}</span>}
             <button onClick={()=>{const [s,e]=getRange();router.push(`/${brand.id}/decisions${s&&e?`?start=${s}&end=${e}`:''}`);}}
               className="px-4 py-2.5 text-white rounded-xl text-sm font-bold shadow-sm hover:opacity-90 transition-opacity whitespace-nowrap"
-              style={{background:'linear-gradient(135deg,#FDE047,#F59E0B)'}}>
+              style={{background:'linear-gradient(135deg,#F97316,#EF4444)'}}>
               🩺 광고 진단
             </button>
             <button onClick={()=>router.push('/')}
