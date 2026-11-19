@@ -61,20 +61,24 @@ async function getMetaAds(cfg, startDate, endDate) {
 async function getAdTags(cfg) {
   try {
     const rows = await fetchMetaPages(`${META_BASE}/act_${cfg.adAccountId}/ads`, {
-      fields: 'id,creative{url_tags,object_story_spec{link_data{link},video_data{call_to_action}},asset_feed_spec{link_urls}}',
+      fields: 'id,creative{url_tags,thumbnail_url,image_url,object_story_spec{link_data{link,picture},video_data{call_to_action,image_url}},asset_feed_spec{link_urls,images{url},videos{thumbnail_url}}}',
+      thumbnail_width: 300, thumbnail_height: 300,
       filtering: JSON.stringify([{ field: 'effective_status', operator: 'IN', value: ['ACTIVE'] }]),
       limit: 200, access_token: cfg.metaToken,
     });
     return Object.fromEntries(rows.map(r => {
       const c = r.creative || {};
       const oss = c.object_story_spec || {};
+      const afs = c.asset_feed_spec || {};
       const parts = [
         c.url_tags || '',
         oss.link_data?.link || '',
         oss.video_data?.call_to_action?.value?.link || '',
-        ...((c.asset_feed_spec?.link_urls || []).map(l => l.website_url || '')),
+        ...((afs.link_urls || []).map(l => l.website_url || '')),
       ];
-      return [r.id, parts.join(' ')];
+      const thumb = oss.video_data?.image_url || oss.link_data?.picture || afs.images?.[0]?.url
+        || afs.videos?.[0]?.thumbnail_url || c.image_url || c.thumbnail_url || null;
+      return [r.id, { tags: parts.join(' ').trim(), thumb }];
     }));
   } catch { return {}; }
 }
@@ -161,7 +165,8 @@ export default async function handler(req, res) {
       const roasB = adB ? roas(revB, adB.spend) : null;
 
       // ── 설정 오류 점검 ──
-      const tagStr = (adTags[ad.adId] ?? '').trim();
+      const adMeta = adTags[ad.adId] || {};
+      const tagStr = (adMeta.tags || '').trim();
       // UTM이 실제로 작동하는지의 가장 확실한 증거: GA4에 이 광고 '이름'으로 매출/유입이 잡히는가
       const nameMatchedRev = ga4Full
         .filter(g => (g.campaign === ad.campaignName && g.ad === ad.adName) || (g.ad === ad.adName && g.ad !== '(not set)'))
@@ -189,14 +194,15 @@ export default async function handler(req, res) {
 
       // ── 분류 ──
       const flags = [];
-      if (ad.frequency >= 3.5) flags.push({ k: 'fatigue', label: '피로 주의', detail: `빈도 ${ad.frequency.toFixed(1)} — 같은 사람에게 반복 노출 중, 새 소재 준비 추천` });
+      const perfWeak = r < breakeven * 1.2 || (roasA != null && roasB != null && roasA > 0 && roasB < roasA * 0.7);
+      if (ad.frequency >= 3.5 && perfWeak) flags.push({ k: 'fatigue', label: '피로 주의', detail: `빈도 ${ad.frequency.toFixed(1)} — 같은 사람에게 반복 노출되는 중인데 성과도 약해지고 있어요. 새 소재 교체 준비 추천 (빈도가 높아도 성과가 유지되는 소재엔 띄우지 않아요)` });
 
       let category, reason, options;
       const dropping = roasA != null && roasB != null && roasA > 0 && roasB < roasA * 0.6;
 
-      if (ad.spend < MIN_SPEND) {
+      if (ad.spend < MIN_SPEND && ad.clicks < 50) {
         category = 'hold';
-        reason = `광고비 ${Math.round(ad.spend / 10000)}만원 — 판단하기엔 데이터가 적어요`;
+        reason = `광고비 ${(Math.round(ad.spend / 1000) / 10).toLocaleString('ko-KR')}만원 · 클릭 ${ad.clicks}회 — 아직 데이터가 적어요 (광고비 3만원 또는 클릭 50회가 쌓이면 자동 판단돼요)`;
         options = ['더 지켜보기', '끄기'];
       } else if (r < breakeven * 0.6) {
         category = 'off';
@@ -220,7 +226,8 @@ export default async function handler(req, res) {
 
       return {
         adId: ad.adId, adName: ad.adName, campaignName: ad.campaignName, adsetName: ad.adsetName,
-        spend: Math.round(ad.spend), revenue: Math.round(revenue), roas: r,
+        thumbnail: adMeta.thumb || null,
+        spend: Math.round(ad.spend), revenue: Math.round(revenue), roas: r, clicks: ad.clicks,
         pixelRoas, frequency: Math.round(ad.frequency * 10) / 10,
         firstHalf: roasA != null ? { range: half.a, roas: roasA, spend: Math.round(adA.spend) } : null,
         secondHalf: roasB != null ? { range: half.b, roas: roasB, spend: Math.round(adB.spend) } : null,

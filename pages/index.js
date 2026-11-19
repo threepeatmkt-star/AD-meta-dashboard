@@ -159,7 +159,7 @@ function BrandPicker() {
               🧪 환경 진단 <span className="text-gray-400 font-medium">(픽셀·GA4 점검)</span>
             </p>
             <p className="text-xs text-gray-400 mt-1 group-hover:text-gray-600 transition-colors">
-              픽셀·GA4 설치 상태 · 과집계 진단 →
+              메타 픽셀·자사몰 GA4·GTM 스크립트 설치 상태·과집계 진단 →
             </p>
           </button>
         </div>

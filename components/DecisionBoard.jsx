@@ -21,6 +21,8 @@ function getPresetRange(preset) {
   switch (preset) {
     case 'last7': return [fmt(daysAgo(7)), fmt(daysAgo(1))];
     case 'last30': return [fmt(daysAgo(30)), fmt(daysAgo(1))];
+    case 'thisMonth': return [fmt(new Date(now.getFullYear(), now.getMonth(), 1)), fmt(now)];
+    case 'lastMonth': return [fmt(new Date(now.getFullYear(), now.getMonth() - 1, 1)), fmt(new Date(now.getFullYear(), now.getMonth(), 0))];
     case 'last14': default: return [fmt(daysAgo(14)), fmt(daysAgo(1))];
   }
 }
@@ -56,6 +58,9 @@ function DecisionCard({ item, brand, decision, onDecide, adAccountId }) {
       style={{ borderColor: decision ? '#E5E7EB' : cat.color + '55' }}>
       <button onClick={() => setOpen(!open)} className="w-full text-left px-5 py-4">
         <div className="flex items-start justify-between gap-4">
+          {item.thumbnail
+            ? <img src={item.thumbnail} alt="" className="w-16 h-16 rounded-xl object-cover border border-gray-100 shrink-0 bg-gray-50"/>
+            : <div className="w-16 h-16 rounded-xl bg-gray-100 shrink-0 flex items-center justify-center text-gray-300 text-[10px]">이미지<br/>없음</div>}
           <div className="min-w-0 flex-1">
             <AdPath item={item}/>
             <div className="flex items-center gap-2 flex-wrap">
@@ -170,6 +175,10 @@ export default function DecisionBoard({ brand }) {
   const [error, setError] = useState('');
   const [decisions, setDecisions] = useState({});
   const [q, setQ] = useState('');
+  const [useCustom, setUseCustom] = useState(false);
+  const [customStart, setCustomStart] = useState('');
+  const [customEnd, setCustomEnd] = useState('');
+  const customEndRef = useRef(null);
   const loadedQuery = useRef(false);
 
   useEffect(() => {
@@ -188,7 +197,10 @@ export default function DecisionBoard({ brand }) {
     loadedQuery.current = true;
   }, [router.isReady, router.query]);
 
-  const getRange = useCallback(() => custom || getPresetRange(preset), [custom, preset]);
+  const getRange = useCallback(() => {
+    if (useCustom && customStart && customEnd) return [customStart, customEnd];
+    return custom || getPresetRange(preset);
+  }, [useCustom, customStart, customEnd, custom, preset]);
 
   const load = useCallback(async () => {
     const [start, end] = getRange();
@@ -225,7 +237,7 @@ export default function DecisionBoard({ brand }) {
   const undecided = items.filter(i => !decisions[i.adId] && (i.category === 'off' || i.category === 'fix' || i.category === 'scale'));
   const decidedCount = items.filter(i => decisions[i.adId]).length;
 
-  const PRESETS = [{ v: 'last7', l: '최근 7일' }, { v: 'last14', l: '최근 14일' }, { v: 'last30', l: '최근 30일' }];
+  const PRESETS = [{ v: 'last7', l: '최근 7일' }, { v: 'last14', l: '최근 14일' }, { v: 'last30', l: '최근 30일' }, { v: 'thisMonth', l: '이번 달' }, { v: 'lastMonth', l: '지난 달' }];
 
   return (
     <div className="min-h-screen bg-slate-50" style={{ fontFamily: "'Pretendard','Apple SD Gothic Neo',sans-serif" }}>
@@ -266,15 +278,30 @@ export default function DecisionBoard({ brand }) {
       </header>
 
       {/* 기간 */}
-      <div className="bg-white border-b border-gray-100">
+      <div className="bg-white border-b border-gray-100 md:sticky md:top-[73px] md:z-[15]">
         <div className="max-w-screen-xl mx-auto px-6 py-3 flex flex-wrap items-center gap-2">
           {PRESETS.map(p => (
-            <button key={p.v} onClick={() => { setCustom(null); setShortNote(false); setPreset(p.v); }}
-              className={`px-4 py-2 rounded-xl text-sm font-semibold transition-all ${!custom && preset === p.v ? 'text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
-              style={!custom && preset === p.v ? { background: BC } : {}}>
+            <button key={p.v} onClick={() => { setCustom(null); setUseCustom(false); setShortNote(false); setPreset(p.v); }}
+              className={`px-4 py-2 rounded-xl text-sm font-semibold transition-all ${!custom && !useCustom && preset === p.v ? 'text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+              style={!custom && !useCustom && preset === p.v ? { background: BC } : {}}>
               {p.l}
             </button>
           ))}
+          <button onClick={() => { setCustom(null); setShortNote(false); setUseCustom(true); }}
+            className={`px-4 py-2 rounded-xl text-sm font-semibold transition-all ${useCustom ? 'text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+            style={useCustom ? { background: BC } : {}}>
+            직접 설정
+          </button>
+          {useCustom && (
+            <div className="flex items-center gap-2">
+              <input type="date" value={customStart}
+                onChange={e => { setCustomStart(e.target.value); if (e.target.value) requestAnimationFrame(() => { try { customEndRef.current?.focus(); customEndRef.current?.showPicker?.(); } catch {} }); }}
+                className="border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-300"/>
+              <span className="text-gray-400">~</span>
+              <input type="date" ref={customEndRef} value={customEnd} min={customStart || undefined} onChange={e => setCustomEnd(e.target.value)}
+                className="border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-300"/>
+            </div>
+          )}
           <p className="text-sm text-gray-400 ml-1">📅 {rangeStart} ~ {rangeEnd}{custom ? ' (대시보드 기간)' : ''}</p>
           <div className="ml-auto flex items-center gap-3">
             <input value={q} onChange={e => setQ(e.target.value)} placeholder="🔍 캠페인·광고세트·소재 검색"
@@ -282,6 +309,13 @@ export default function DecisionBoard({ brand }) {
             {data && <p className="text-sm text-gray-500 whitespace-nowrap hidden md:block">손익분기 ROAS <b className="text-gray-800">{data.breakeven}%</b> (ERP 원가 기준)</p>}
           </div>
         </div>
+        {useCustom && customStart && customEnd && rangeDays(customStart, customEnd) < 7 && (
+          <div className="max-w-screen-xl mx-auto px-6 pb-3">
+            <p className="text-sm text-amber-700 bg-amber-50 border border-amber-100 rounded-xl px-4 py-2.5">
+              ⚠ 기간이 7일 미만이면 데이터가 적어 판단 보류가 많아져요 — 가능하면 7일 이상으로 보는 걸 추천해요.
+            </p>
+          </div>
+        )}
         {shortNote && (
           <div className="max-w-screen-xl mx-auto px-6 pb-3">
             <p className="text-sm text-blue-700 bg-blue-50 border border-blue-100 rounded-xl px-4 py-2.5">
@@ -296,7 +330,7 @@ export default function DecisionBoard({ brand }) {
 
         {/* 요약 타일 */}
         {data && (
-          <div className="grid grid-cols-3 sm:grid-cols-6 gap-3 mb-6">
+          <div className="grid grid-cols-3 sm:grid-cols-6 gap-3 mb-6 md:sticky md:top-[134px] md:z-10 bg-slate-50/95 backdrop-blur-sm py-2 -my-2 rounded-xl">
             <button onClick={() => scrollTo('sec-errors')}
               className="rounded-2xl bg-white border-2 border-red-200 px-4 py-3 text-center hover:shadow-md hover:-translate-y-0.5 transition-all">
               <p className="text-2xl font-extrabold text-red-600">{data.summary.errorAds || 0}</p>
@@ -347,7 +381,8 @@ export default function DecisionBoard({ brand }) {
               {errorItems.map(i => (
                 <div key={i.adId} className="rounded-2xl bg-white border border-red-200 px-5 py-3.5">
                   <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
+                    {i.thumbnail && <img src={i.thumbnail} alt="" className="w-12 h-12 rounded-lg object-cover border border-gray-100 shrink-0 bg-gray-50"/>}
+                    <div className="min-w-0 flex-1">
                       <AdPath item={i} size="sm"/>
                       <p className="text-base font-extrabold text-gray-900 mt-1">{i.adName}</p>
                     </div>
