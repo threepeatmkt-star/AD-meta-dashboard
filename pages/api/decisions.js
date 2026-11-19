@@ -161,11 +161,21 @@ export default async function handler(req, res) {
       const roasB = adB ? roas(revB, adB.spend) : null;
 
       // ── 설정 오류 점검 ──
-      const tagStr = adTags[ad.adId] ?? '';
+      const tagStr = (adTags[ad.adId] ?? '').trim();
+      // UTM이 실제로 작동하는지의 가장 확실한 증거: GA4에 이 광고 '이름'으로 매출/유입이 잡히는가
+      const nameMatchedRev = ga4Full
+        .filter(g => (g.campaign === ad.campaignName && g.ad === ad.adName) || (g.ad === ad.adName && g.ad !== '(not set)'))
+        .reduce((s, g) => s + g.revenue, 0);
       const errors = [];
-      if (tagStr && !/utm_/i.test(tagStr)) {
+      if (!tagStr) {
+        // 파트너십(크리에이터 계정) 광고 등은 메타 API가 URL 필드를 안 보여줌 → GA4 유입으로 교차 검증
+        if (nameMatchedRev === 0 && ad.spend >= MIN_SPEND) {
+          errors.push({ k: 'utmUnknown', label: 'UTM 확인 불가', detail: '파트너십 광고 등은 URL을 API로 읽을 수 없어요. 이 기간 GA4에 이 소재 이름의 UTM 유입 매출도 안 잡혀서, 광고관리자에서 웹사이트 URL에 UTM이 붙어있는지 직접 확인해주세요 (UTM이 있어도 구매가 없었던 것뿐일 수 있어요)' });
+        }
+        // GA4에 이름으로 매출이 잡히면 UTM 정상 작동 → 오류 아님
+      } else if (!/utm_/i.test(tagStr)) {
         errors.push({ k: 'noUtm', label: 'UTM 없음', detail: '랜딩 URL과 URL 매개변수 어디에도 UTM이 없어요 — 이 소재의 매출은 메타 자동 태그(ig/paid)나 바이럴로 흘러갑니다. 표준 UTM 템플릿을 넣어주세요 (기존 광고 URL 수정은 머신러닝 초기화 주의 → 신규 소재부터 적용 추천)' });
-      } else if (tagStr && /utm_/i.test(tagStr) && !/utm_medium=cpm/i.test(tagStr)) {
+      } else if (!/utm_medium=cpm/i.test(tagStr)) {
         errors.push({ k: 'utmNonStd', label: 'UTM 비표준', detail: 'UTM은 있는데 utm_medium이 cpm이 아니에요 — DA 매출 집계 기준(cpm)과 어긋나 분류가 흔들릴 수 있어요' });
       }
       if (ad.spend >= MIN_SPEND && revenue === 0 && ad.pixelRevenue > 0) {
