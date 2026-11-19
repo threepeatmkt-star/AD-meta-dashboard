@@ -137,10 +137,18 @@ function DecisionCard({ item, brand, decision, onDecide, adAccountId, onReload, 
       {open && (
         <div className="px-5 pb-5 border-t border-gray-100 pt-4 bg-gray-50/50">
           {/* 근거 수치 */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-4">
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mb-4">
             <div className="rounded-xl bg-white border border-gray-100 px-3 py-2.5">
               <p className="text-xs text-gray-400">GA4 매출 (UTM+광고ID 매핑)</p>
               <p className="text-base font-bold text-gray-900 mt-0.5">{krw(item.revenue)}</p>
+            </div>
+            <div className="rounded-xl bg-white border border-gray-100 px-3 py-2.5">
+              <p className="text-xs text-gray-400">노출 / 도달</p>
+              <p className="text-base font-bold text-gray-900 mt-0.5">{(item.impressions || 0).toLocaleString('ko-KR')} / {(item.reach || 0).toLocaleString('ko-KR')}</p>
+            </div>
+            <div className="rounded-xl bg-white border border-gray-100 px-3 py-2.5">
+              <p className="text-xs text-gray-400">클릭 (CTR)</p>
+              <p className="text-base font-bold text-gray-900 mt-0.5">{(item.clicks || 0).toLocaleString('ko-KR')} <span className="text-sm text-gray-500">({item.ctr || 0}%)</span></p>
             </div>
             <div className="rounded-xl bg-white border border-gray-100 px-3 py-2.5 overflow-visible">
               <p className="text-xs text-gray-400 flex items-center gap-1.5">빈도

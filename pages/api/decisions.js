@@ -38,7 +38,7 @@ async function fetchMetaPages(url, params) {
 async function getMetaAds(cfg, startDate, endDate) {
   const rows = await fetchMetaPages(`${META_BASE}/act_${cfg.adAccountId}/insights`, {
     level: 'ad',
-    fields: 'campaign_id,campaign_name,adset_id,adset_name,ad_id,ad_name,spend,frequency,impressions,inline_link_clicks,action_values',
+    fields: 'campaign_id,campaign_name,adset_id,adset_name,ad_id,ad_name,spend,frequency,reach,impressions,inline_link_clicks,action_values',
     time_range: JSON.stringify({ since: startDate, until: endDate }),
     filtering: JSON.stringify([{ field: 'ad.effective_status', operator: 'IN', value: ['ACTIVE'] }]),
     limit: 200, access_token: cfg.metaToken,
@@ -52,6 +52,7 @@ async function getMetaAds(cfg, startDate, endDate) {
       spend: parseFloat(r.spend) || 0,
       frequency: parseFloat(r.frequency) || 0,
       impressions: parseInt(r.impressions) || 0,
+      reach: parseInt(r.reach) || 0,
       clicks: parseInt(r.inline_link_clicks) || 0,
       pixelRevenue: purchase ? parseFloat(purchase.value) || 0 : 0,
     };
@@ -170,6 +171,14 @@ export default async function handler(req, res) {
     const mapById = rows => Object.fromEntries(rows.map(r => [r.adId, r]));
     const aById = mapById(adsA), bById = mapById(adsB);
 
+    // 세트별 노출 합계 — '노출 못 받음' 판정용
+    const adsetImp = {};
+    const adsetAdCount = {};
+    adsFull.forEach(a => {
+      adsetImp[a.adsetId] = (adsetImp[a.adsetId] || 0) + a.impressions;
+      adsetAdCount[a.adsetId] = (adsetAdCount[a.adsetId] || 0) + 1;
+    });
+
     const items = adsFull.map(ad => {
       const revenue = matchRevenue(ga4Full, ad);
       const r = roas(revenue, ad.spend);
@@ -214,6 +223,20 @@ export default async function handler(req, res) {
       const perfWeak = r < breakeven * 1.2 || (roasA != null && roasB != null && roasA > 0 && roasB < roasA * 0.7);
       if (ad.frequency >= 3.5 && perfWeak) flags.push({ k: 'fatigue', label: '피로 주의', detail: `빈도 ${ad.frequency.toFixed(1)} — 같은 사람에게 반복 노출되는 중인데 성과도 약해지고 있어요. 새 소재 교체 준비 추천 (빈도가 높아도 성과가 유지되는 소재엔 띄우지 않아요)` });
 
+      // ── 퍼널 단계별 진단 ──
+      const ctr = ad.impressions > 0 ? Math.round((ad.clicks / ad.impressions) * 10000) / 100 : 0;
+      const totalImp = adsetImp[ad.adsetId] || 0;
+      const impShare = totalImp > 0 ? Math.round((ad.impressions / totalImp) * 100) : 0;
+      if ((adsetAdCount[ad.adsetId] || 1) >= 2 && totalImp >= 3000 && impShare < 10) {
+        flags.push({ k: 'lowDelivery', label: '노출 못 받음', detail: `세트 내 노출 점유율 ${impShare}% (${ad.impressions.toLocaleString('ko-KR')}회) — 메타가 같은 세트의 다른 소재에 노출을 몰아주고 있어요. 소재가 나빠서가 아니라 평가 기회 자체를 못 받은 상태라, 성과 숫자로 판단하면 안 돼요. 이 소재를 밀어보고 싶으면 단독 광고세트로 분리하는 게 확실해요` });
+      }
+      if (ad.impressions >= 3000 && ctr < 0.5) {
+        flags.push({ k: 'lowCtr', label: '클릭률 낮음', detail: `노출 ${ad.impressions.toLocaleString('ko-KR')}회를 받았는데 CTR ${ctr}% — 소재가 시선을 못 잡고 있어요 (계정 평균 약 1%). 썸네일·첫 문구·영상 첫 3초 후킹을 점검해주세요` });
+      }
+      if (ad.clicks >= 50 && revenue === 0 && ad.pixelRevenue === 0) {
+        flags.push({ k: 'funnelLeak', label: '전환 퍼널 의심', detail: `클릭 ${ad.clicks}회가 들어왔는데 구매가 0이에요 (픽셀 기준도 0) — 소재 문제가 아니라 클릭 이후 단계 문제예요. 상세페이지 첫 화면·가격/옵션 구성·로딩 속도를 점검해주세요` });
+      }
+
       let category, reason, options;
       const dropping = roasA != null && roasB != null && roasA > 0 && roasB < roasA * 0.6;
 
@@ -247,6 +270,8 @@ export default async function handler(req, res) {
         dailyBudget: budgets.adset[ad.adsetId] || 0,
         campaignDailyBudget: budgets.campaign[ad.campaignId] || 0,
         spend: Math.round(ad.spend), revenue: Math.round(revenue), roas: r, clicks: ad.clicks,
+        impressions: ad.impressions, reach: ad.reach,
+        ctr: ad.impressions > 0 ? Math.round((ad.clicks / ad.impressions) * 10000) / 100 : 0,
         pixelRoas, frequency: Math.round(ad.frequency * 10) / 10,
         firstHalf: roasA != null ? { range: half.a, roas: roasA, spend: Math.round(adA.spend) } : null,
         secondHalf: roasB != null ? { range: half.b, roas: roasB, spend: Math.round(adB.spend) } : null,
