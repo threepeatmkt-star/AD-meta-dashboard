@@ -71,12 +71,28 @@ async function brandCheck(b, ga4Token) {
         const { data: gtmJs } = await axios.get(`https://www.googletagmanager.com/gtm.js?id=${gtmId}`, { timeout: 15000 });
         gtmGa4Ids = [...new Set(String(gtmJs).match(/G-[A-Z0-9]{6,12}/g) || [])];
       } catch {}
-      checks.push({
-        name: 'GA4 설치', status: gtmGa4Ids.length ? 'ok' : 'warn',
-        detail: gtmGa4Ids.length
-          ? `GTM(${gtmId}) 컨테이너 안에서 GA4 태그 확인됨 (측정 ID: ${gtmGa4Ids.join(', ')}) — GTM 경유로 정상 설치`
-          : `GTM(${gtmId})은 있지만 컨테이너 안에서 GA4 측정 ID를 찾지 못했어요 — GTM 작업공간에서 GA4 구성 태그가 게시됐는지 확인 필요`,
-      });
+      if (gtmGa4Ids.length) {
+        checks.push({ name: 'GA4 설치', status: 'ok', detail: `GTM(${gtmId}) 컨테이너 안에서 GA4 태그 확인됨 (측정 ID: ${gtmGa4Ids.join(', ')}) — GTM 경유로 정상 설치` });
+      } else {
+        // 컨테이너에서 ID가 안 보이면, GA4 속성에 어제 데이터가 실제로 쌓였는지로 최종 판정
+        let ySessions = null;
+        if (cfg.missing.length === 0) {
+          try {
+            const { data: rt } = await axios.post(
+              `https://analyticsdata.googleapis.com/v1beta/properties/${cfg.ga4PropertyId}:runReport`,
+              { dateRanges: [{ startDate: kstDate(1), endDate: kstDate(1) }], metrics: [{ name: 'sessions' }] },
+              { headers: { Authorization: `Bearer ${ga4Token}` }, timeout: 30000 }
+            );
+            ySessions = parseInt(rt.rows?.[0]?.metricValues?.[0]?.value || 0);
+          } catch {}
+        }
+        checks.push({
+          name: 'GA4 설치', status: ySessions > 0 ? 'ok' : 'warn',
+          detail: ySessions > 0
+            ? `GTM(${gtmId}) 경유 설치 — 측정 ID는 런타임에만 노출되지만, GA4 속성에 어제 세션 ${ySessions.toLocaleString('ko-KR')}건이 정상 수집됨 → 작동 정상`
+            : `GTM(${gtmId})은 있지만 GA4 수집 데이터를 확인하지 못했어요 — GTM 작업공간에서 GA4 구성 태그가 게시됐는지 확인 필요`,
+        });
+      }
     } else {
       checks.push({ name: 'GA4 설치', status: 'fail', detail: 'GA4/GTM 스크립트를 찾지 못했어요 — 설치 확인 필요' });
     }
