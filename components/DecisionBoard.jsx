@@ -44,6 +44,11 @@ function AdPath({ item, size = 'md' }) {
       <span className="px-2.5 py-1 rounded-md bg-indigo-50 text-indigo-700 text-sm font-bold whitespace-nowrap">📊 {item.campaignName}</span>
       <span className="text-gray-300 text-sm">›</span>
       <span className="px-2.5 py-1 rounded-md bg-sky-50 text-sky-700 text-sm font-bold whitespace-nowrap">🎯 {item.adsetName}</span>
+      {(item.dailyBudget > 0 || item.campaignDailyBudget > 0) && (
+        <span className="px-2.5 py-1 rounded-md bg-gray-100 text-gray-500 text-sm font-semibold whitespace-nowrap">
+          일예산 {man(item.dailyBudget > 0 ? item.dailyBudget : item.campaignDailyBudget)}{item.dailyBudget > 0 ? '' : ' (캠페인)'}
+        </span>
+      )}
     </div>
   );
 }
@@ -58,10 +63,38 @@ function InfoTip({ lines }) {
   );
 }
 
-function DecisionCard({ item, brand, decision, onDecide, adAccountId }) {
+const REAL_ACTIONS = { '끄기': 'pause_ad', '예산 축소': 'budget_down', '예산 증액': 'budget_up' };
+
+function DecisionCard({ item, brand, decision, onDecide, adAccountId, onReload }) {
   const [open, setOpen] = useState(false);
   const [memo, setMemo] = useState(decision?.memo || '');
+  const [applying, setApplying] = useState(null);
   const cat = CATS[item.category];
+
+  const decide = async (opt) => {
+    const act = REAL_ACTIONS[opt];
+    if (!act) { onDecide(item.adId, { choice: opt, memo, at: new Date().toISOString() }); return; }
+    const what = act === 'pause_ad'
+      ? `소재 "${item.adName}"를 메타에서 실제로 OFF(일시중지)`
+      : act === 'budget_down'
+        ? `광고세트 "${item.adsetName}" 일예산을 30% 축소${item.dailyBudget ? ` (${man(item.dailyBudget)} → ${man(item.dailyBudget * 0.7)})` : ''}`
+        : `광고세트 "${item.adsetName}" 일예산을 30% 증액${item.dailyBudget ? ` (${man(item.dailyBudget)} → ${man(item.dailyBudget * 1.3)})` : ''}`;
+    if (!window.confirm(`${what} — 진행할까요?`)) return;
+    setApplying(opt);
+    try {
+      const r = await fetch('/api/ad-action', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ brand: brand.id, action: act, adId: item.adId, adsetId: item.adsetId }),
+      });
+      const j = await r.json();
+      if (j.error) throw new Error(j.error);
+      onDecide(item.adId, { choice: opt, memo, at: new Date().toISOString(), applied: true, result: j.message });
+      if (act === 'pause_ad' && onReload) setTimeout(onReload, 1500);
+    } catch (e) {
+      alert('메타 반영 실패: ' + e.message + '\n(결정 기록만 저장할게요)');
+      onDecide(item.adId, { choice: opt, memo, at: new Date().toISOString() });
+    } finally { setApplying(null); }
+  };
 
   return (
     <div className={`rounded-2xl border-2 bg-white overflow-hidden transition-shadow ${decision ? 'opacity-75' : 'hover:shadow-md'}`}
@@ -75,7 +108,7 @@ function DecisionCard({ item, brand, decision, onDecide, adAccountId }) {
             <AdPath item={item}/>
             <div className="flex items-center gap-2 flex-wrap">
               <p className="text-lg font-extrabold text-gray-900">{item.adName}</p>
-              {decision && <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-gray-900 text-white">✓ {decision.choice}</span>}
+              {decision && <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-gray-900 text-white">✓ {decision.choice}{decision.applied ? ' · 메타 반영됨' : ''}</span>}
             </div>
             {(item.errors.length > 0 || item.flags.length > 0) && (
               <div className="flex items-center gap-1.5 flex-wrap mt-1.5">
@@ -145,11 +178,11 @@ function DecisionCard({ item, brand, decision, onDecide, adAccountId }) {
           {/* 결정 */}
           <div className="flex flex-wrap items-center gap-2 mt-4">
             {item.options.map(opt => (
-              <button key={opt}
-                onClick={() => onDecide(item.adId, { choice: opt, memo, at: new Date().toISOString() })}
-                className={`px-5 py-2.5 rounded-xl text-[15px] font-bold border-2 transition-colors ${decision?.choice === opt ? 'text-white' : 'bg-white text-gray-700 border-gray-200 hover:border-gray-400'}`}
+              <button key={opt} disabled={applying !== null}
+                onClick={() => decide(opt)}
+                className={`px-5 py-2.5 rounded-xl text-[15px] font-bold border-2 transition-colors disabled:opacity-50 ${decision?.choice === opt ? 'text-white' : 'bg-white text-gray-700 border-gray-200 hover:border-gray-400'}`}
                 style={decision?.choice === opt ? { background: brand.color, borderColor: brand.color } : {}}>
-                {opt}
+                {applying === opt ? '반영 중…' : <>{opt}{REAL_ACTIONS[opt] ? ' ⚡' : ''}</>}
               </button>
             ))}
             {decision && (
@@ -227,6 +260,13 @@ export default function DecisionBoard({ brand }) {
   }, [getRange, brand.id]);
 
   useEffect(() => { if (authed) load(); }, [authed, load]);
+
+  // 5분마다 자동 새로고침 — OFF 처리된 소재는 다음 갱신 때 목록에서 빠져요
+  useEffect(() => {
+    if (!authed) return;
+    const t = setInterval(() => { if (typeof document === 'undefined' || document.visibilityState === 'visible') load(); }, 300000);
+    return () => clearInterval(t);
+  }, [authed, load]);
 
   const onDecide = (adId, decision) => {
     const next = { ...decisions };
@@ -473,7 +513,7 @@ export default function DecisionBoard({ brand }) {
               </div>
               <div className="space-y-3">
                 {group.map(item => (
-                  <DecisionCard key={item.adId} item={item} brand={brand} decision={decisions[item.adId]} onDecide={onDecide} adAccountId={data?.adAccountId}/>
+                  <DecisionCard key={item.adId} item={item} brand={brand} decision={decisions[item.adId]} onDecide={onDecide} adAccountId={data?.adAccountId} onReload={load}/>
                 ))}
               </div>
             </section>

@@ -47,6 +47,7 @@ async function getMetaAds(cfg, startDate, endDate) {
     const purchase = (r.action_values || []).find(a => a.action_type === 'omni_purchase' || a.action_type === 'purchase');
     return {
       campaignName: r.campaign_name, adsetName: r.adset_name,
+      campaignId: r.campaign_id, adsetId: r.adset_id,
       adId: r.ad_id, adName: r.ad_name,
       spend: parseFloat(r.spend) || 0,
       frequency: parseFloat(r.frequency) || 0,
@@ -81,6 +82,21 @@ async function getAdTags(cfg) {
       return [r.id, { tags: parts.join(' ').trim(), thumb }];
     }));
   } catch { return {}; }
+}
+
+// 광고세트·캠페인 일예산 (카드 표시용)
+async function getBudgets(cfg) {
+  try {
+    const flt = JSON.stringify([{ field: 'effective_status', operator: 'IN', value: ['ACTIVE'] }]);
+    const [adsets, camps] = await Promise.all([
+      fetchMetaPages(`${META_BASE}/act_${cfg.adAccountId}/adsets`, { fields: 'id,daily_budget', filtering: flt, limit: 200, access_token: cfg.metaToken }),
+      fetchMetaPages(`${META_BASE}/act_${cfg.adAccountId}/campaigns`, { fields: 'id,daily_budget', filtering: flt, limit: 200, access_token: cfg.metaToken }),
+    ]);
+    return {
+      adset: Object.fromEntries(adsets.map(a => [a.id, parseInt(a.daily_budget) || 0])),
+      campaign: Object.fromEntries(camps.map(c => [c.id, parseInt(c.daily_budget) || 0])),
+    };
+  } catch { return { adset: {}, campaign: {} }; }
 }
 
 // GA4 매출 (캠페인+콘텐츠 차원) — 대시보드와 같은 매칭 규칙
@@ -140,7 +156,7 @@ export default async function handler(req, res) {
     const ga4Token = await getGA4AccessToken();
     const half = splitRange(startDate, endDate);
 
-    const [adsFull, adsA, adsB, ga4Full, ga4A, ga4B, adTags] = await Promise.all([
+    const [adsFull, adsA, adsB, ga4Full, ga4A, ga4B, adTags, budgets] = await Promise.all([
       getMetaAds(cfg, startDate, endDate),
       half.split ? getMetaAds(cfg, half.a[0], half.a[1]) : Promise.resolve([]),
       half.split ? getMetaAds(cfg, half.b[0], half.b[1]) : Promise.resolve([]),
@@ -148,6 +164,7 @@ export default async function handler(req, res) {
       half.split ? getGA4Rows(cfg, half.a[0], half.a[1], ga4Token) : Promise.resolve([]),
       half.split ? getGA4Rows(cfg, half.b[0], half.b[1], ga4Token) : Promise.resolve([]),
       getAdTags(cfg),
+      getBudgets(cfg),
     ]);
 
     const mapById = rows => Object.fromEntries(rows.map(r => [r.adId, r]));
@@ -226,7 +243,9 @@ export default async function handler(req, res) {
 
       return {
         adId: ad.adId, adName: ad.adName, campaignName: ad.campaignName, adsetName: ad.adsetName,
-        thumbnail: adMeta.thumb || null,
+        adsetId: ad.adsetId, thumbnail: adMeta.thumb || null,
+        dailyBudget: budgets.adset[ad.adsetId] || 0,
+        campaignDailyBudget: budgets.campaign[ad.campaignId] || 0,
         spend: Math.round(ad.spend), revenue: Math.round(revenue), roas: r, clicks: ad.clicks,
         pixelRoas, frequency: Math.round(ad.frequency * 10) / 10,
         firstHalf: roasA != null ? { range: half.a, roas: roasA, spend: Math.round(adA.spend) } : null,
