@@ -35,11 +35,12 @@ export default async function handler(req, res) {
     }
     return res.status(400).json({ error: '알 수 없는 action' });
   } catch (err) {
-    const msg = err?.response?.data?.error?.message || err.message;
+    const metaErr = err?.response?.data?.error || {};
+    const msg = metaErr.message || err.message;
     const perm = /permission|ads_management|#200|#10\b|OAuth/i.test(msg);
     return res.status(500).json({
       error: perm
-        ? '메타 토큰에 수정 권한(ads_management)이 없어요 — 이번엔 광고관리자에서 직접 처리하고, 토큰 권한을 올리면 버튼으로 바로 반영돼요'
+        ? `권한 문제로 반영 실패 — dashboard-bot에 이 광고 계정의 '관리' 권한이 할당됐는지 확인해주세요 (비즈니스 설정 → 시스템 사용자 → 자산). 메타 원본 메시지: ${msg}`
         : msg,
     });
   }
