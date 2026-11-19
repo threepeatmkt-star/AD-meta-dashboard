@@ -65,7 +65,7 @@ function InfoTip({ lines }) {
 
 const REAL_ACTIONS = { '끄기': 'pause_ad', '예산 축소': 'budget_down', '예산 증액': 'budget_up' };
 
-function DecisionCard({ item, brand, decision, onDecide, adAccountId, onReload }) {
+function DecisionCard({ item, brand, decision, onDecide, adAccountId, onReload, siblingCount }) {
   const [open, setOpen] = useState(false);
   const [memo, setMemo] = useState(decision?.memo || '');
   const [applying, setApplying] = useState(null);
@@ -74,12 +74,15 @@ function DecisionCard({ item, brand, decision, onDecide, adAccountId, onReload }
   const decide = async (opt) => {
     const act = REAL_ACTIONS[opt];
     if (!act) { onDecide(item.adId, { choice: opt, memo, at: new Date().toISOString() }); return; }
-    const what = act === 'pause_ad'
-      ? `소재 "${item.adName}"를 메타에서 실제로 OFF(일시중지)`
-      : act === 'budget_down'
-        ? `광고세트 "${item.adsetName}" 일예산 1만원 축소${item.dailyBudget ? ` (${man(item.dailyBudget)} → ${man(Math.max(10000, item.dailyBudget - 10000))})` : ''}`
-        : `광고세트 "${item.adsetName}" 일예산 1만원 증액${item.dailyBudget ? ` (${man(item.dailyBudget)} → ${man(item.dailyBudget + 10000)})` : ''}`;
-    if (!window.confirm(`${what} — 진행할까요?`)) return;
+    let confirmMsg;
+    if (act === 'pause_ad') {
+      confirmMsg = `소재 "${item.adName}"를 메타에서 실제로 OFF(일시중지)할까요?\n(이 소재 1개만 꺼지고, 같은 세트의 다른 소재는 그대로예요)`;
+    } else {
+      const dir = act === 'budget_down' ? '축소' : '증액';
+      const next = act === 'budget_down' ? Math.max(10000, item.dailyBudget - 10000) : item.dailyBudget + 10000;
+      confirmMsg = `⚠ 예산은 소재가 아니라 "광고세트" 단위로 적용돼요.\n\n광고세트 "${item.adsetName}"\n일예산 ${dir}: ${man(item.dailyBudget)} → ${man(next)}\n\n이 세트에 켜진 소재 ${siblingCount || 1}개 전체에 영향이 갑니다. 진행할까요?`;
+    }
+    if (!window.confirm(confirmMsg)) return;
     setApplying(opt);
     try {
       const r = await fetch('/api/ad-action', {
@@ -198,6 +201,7 @@ function DecisionCard({ item, brand, decision, onDecide, adAccountId, onReload }
               </a>
             )}
           </div>
+          <p className="mt-2 text-xs text-gray-400">⚡ 버튼은 메타에 실제 반영 · 끄기 = 이 소재만 OFF · 예산 축소/증액 = 광고세트 전체({siblingCount || 1}개 소재) 일예산 ±1만원</p>
           <input value={memo} onChange={e => setMemo(e.target.value)}
             onBlur={() => decision && onDecide(item.adId, { ...decision, memo })}
             placeholder="메모 (선택) — 예: 다음 주까지 지켜보고 끄기"
@@ -513,7 +517,8 @@ export default function DecisionBoard({ brand }) {
               </div>
               <div className="space-y-3">
                 {group.map(item => (
-                  <DecisionCard key={item.adId} item={item} brand={brand} decision={decisions[item.adId]} onDecide={onDecide} adAccountId={data?.adAccountId} onReload={load}/>
+                  <DecisionCard key={item.adId} item={item} brand={brand} decision={decisions[item.adId]} onDecide={onDecide} adAccountId={data?.adAccountId} onReload={load}
+                    siblingCount={items.filter(x => x.adsetId === item.adsetId).length}/>
                 ))}
               </div>
             </section>
