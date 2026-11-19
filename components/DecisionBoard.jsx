@@ -275,9 +275,9 @@ export default function DecisionBoard({ brand }) {
     ],
   };
   const ERROR_RULES = [
-    'UTM 없음: 랜딩 URL·URL 매개변수 어디에도 utm이 없음',
+    'UTM 없음: 랜딩 URL·URL 매개변수 어디에도 utm이 없음 — 인스타 일부 경로는 자동 태그(ig/paid)로 구제되지만, 페북 지면·외부 브라우저 클릭은 유입 미상으로 새요',
     'UTM 비표준: utm_medium이 cpm이 아님',
-    'GA4 매출 0: 픽셀엔 매출이 찍히는데 GA4는 0원 (광고비 3만원 이상만)',
+    'GA4 매출 0: 수동 UTM + 메타 자동 태그(ig/paid 광고ID 매핑)까지 합쳐도 GA4 매출 0원인데 픽셀엔 매출이 찍힘 (광고비 3만원 이상만)',
     'UTM 확인 불가: 파트너십 광고 등 URL을 API로 못 읽고, GA4 유입도 없음',
   ];
 
