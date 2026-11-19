@@ -220,6 +220,68 @@ function DecisionCard({ item, brand, decision, onDecide, adAccountId, onReload, 
   );
 }
 
+function CriteriaModal({ bk, onClose }) {
+  const Row = ({ c }) => (
+    <tr className="border-t border-gray-100">
+      {c.map((v, i) => <td key={i} className={`px-3 py-2.5 align-top text-sm ${i === 0 ? 'whitespace-nowrap font-bold' : 'text-gray-600 leading-relaxed'}`}>{v}</td>)}
+    </tr>
+  );
+  const Table = ({ title, head, rows }) => (
+    <div className="mb-6">
+      <p className="text-base font-extrabold text-gray-900 mb-2">{title}</p>
+      <div className="rounded-xl border border-gray-200 overflow-hidden">
+        <table className="w-full text-left">
+          <thead className="bg-gray-50">
+            <tr>{head.map(h => <th key={h} className="px-3 py-2 text-xs font-bold text-gray-500">{h}</th>)}</tr>
+          </thead>
+          <tbody className="bg-white">{rows.map((c, i) => <Row key={i} c={c}/>)}</tbody>
+        </table>
+      </div>
+    </div>
+  );
+  return (
+    <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/40 p-4 overflow-y-auto" onClick={onClose}>
+      <div className="bg-white rounded-2xl shadow-2xl max-w-3xl w-full my-8 p-6" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between mb-4">
+          <p className="text-xl font-extrabold text-gray-900">📋 광고 진단 공식 기준표</p>
+          <button onClick={onClose} className="w-9 h-9 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-500 font-bold">✕</button>
+        </div>
+
+        <Table title={`① 분류 기준 — 위에서부터 순서대로 판정해요 (손익분기 ${bk}% 기준)`}
+          head={['분류', '조건', '의미']}
+          rows={[
+            ['⚪ 판단 보류 (데이터 부족)', '광고비 3만원 미만 AND 클릭 50회 미만', `표본이 작아 판단 불가 — ROAS가 1,000%여도 구매 1~2건짜리 숫자라 믿으면 안 돼요. 광고비 3만원 또는 클릭 50회부터 자동 판정`],
+            ['⚪ 판단 보류 (노출 못 받음)', `세트 내 노출 점유율 10% 미만 AND ROAS ${bk}% 미만`, '메타가 노출을 안 줘서 평가 기회가 없었던 소재 — 숫자가 나빠도 소재 탓 아님. 밀어보려면 단독 세트 분리'],
+            ['🔴 OFF 검토', `ROAS < ${Math.round(bk * 0.6)}% (손익분기의 60%)`, '충분히 평가받았는데 쓸수록 손해'],
+            ['🟢 증액 검토', `ROAS ≥ ${bk * 2}% (손익분기의 2배) AND 기간 후반에도 손익분기 위`, '검증 끝 + 안 꺾임 — 예산 증액 후보'],
+            ['🟠 개선 필요', `ROAS < ${Math.round(bk * 1.2)}% (손익분기의 1.2배) 또는 전반→후반 40% 이상 급락`, '이익 여유가 없거나 꺾이는 중'],
+            ['🔵 유지', '위에 안 걸린 나머지 (손익분기의 1.2~2배 안정)', '이익은 나지만 증액 근거까진 아님'],
+          ]}/>
+
+        <Table title="② 플래그(⚠) — 분류와 별개의 참고 표시 (분류가 바뀌진 않아요)"
+          head={['플래그', '조건', '의미 / 처방']}
+          rows={[
+            ['⚠ 피로 주의', '빈도 3.5 이상 AND 성과 약세(손익분기 근처 또는 하락 중)', '같은 사람에게 반복 노출 — 새 소재 교체 준비. 빈도 높아도 성과 좋으면 안 뜸'],
+            ['⚠ 노출 못 받음', '세트에 소재 2개↑ + 세트 노출 3천↑인데 점유율 10% 미만', '메타가 다른 소재에 몰아줌 — 성과 숫자로 판단 금지'],
+            ['⚠ 클릭률 낮음', '노출 3천↑ AND CTR 0.5% 미만', '시선을 못 잡는 소재 — 썸네일·첫 3초 점검'],
+            ['⚠ 전환 퍼널 의심', '클릭 50↑ AND GA4·픽셀 구매 모두 0', '소재는 제 역할 — 상세페이지·가격·로딩 문제'],
+          ]}/>
+
+        <Table title="③ 설정 오류(🚨) — 숫자가 새는 원인"
+          head={['오류', '조건']}
+          rows={[
+            ['🚨 UTM 없음', '랜딩 URL·URL 매개변수 어디에도 utm이 없음'],
+            ['🚨 UTM 비표준', 'utm_medium이 cpm이 아님'],
+            ['🚨 GA4 매출 0', '수동 UTM + 자동 태그(광고ID 매핑) 합쳐도 GA4 0원인데 픽셀엔 매출 있음'],
+            ['🚨 UTM 확인 불가', '파트너십 광고라 URL을 API로 못 읽고 GA4 유입도 없음'],
+          ]}/>
+
+        <p className="text-xs text-gray-400">기준값 변경은 관리자에게 요청 (손익분기: lib/brands.js · 임계값: pages/api/decisions.js)</p>
+      </div>
+    </div>
+  );
+}
+
 export default function DecisionBoard({ brand }) {
   const router = useRouter();
   const [authed, setAuthed] = useState(null);
@@ -232,6 +294,7 @@ export default function DecisionBoard({ brand }) {
   const [decisions, setDecisions] = useState({});
   const [q, setQ] = useState('');
   const [useCustom, setUseCustom] = useState(false);
+  const [showCriteria, setShowCriteria] = useState(false);
   const [customStart, setCustomStart] = useState('');
   const [customEnd, setCustomEnd] = useState('');
   const customEndRef = useRef(null);
@@ -342,6 +405,8 @@ export default function DecisionBoard({ brand }) {
         <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css"/>
       </Head>
 
+      {showCriteria && <CriteriaModal bk={bk} onClose={() => setShowCriteria(false)}/>}
+
       <header className="bg-white border-b border-gray-200 sticky top-0 z-20 shadow-sm">
         <div className="max-w-screen-xl mx-auto px-6 py-4 flex items-center justify-between flex-wrap gap-3">
           <div className="flex items-center gap-3">
@@ -403,16 +468,12 @@ export default function DecisionBoard({ brand }) {
             <input value={q} onChange={e => setQ(e.target.value)} placeholder="🔍 캠페인·광고세트·소재 검색"
               className="border border-gray-200 rounded-xl px-4 py-2 text-sm w-56 focus:outline-none focus:ring-2 focus:ring-amber-300"/>
             {data && (
-              <p className="text-sm text-gray-500 whitespace-nowrap hidden md:flex items-center gap-1.5">
+              <p className="text-sm text-gray-500 whitespace-nowrap hidden md:flex items-center gap-2">
                 손익분기 ROAS <b className="text-gray-800">{data.breakeven}%</b> (ERP 원가 기준)
-                <InfoTip lines={[
-                  '⚠ 플래그(주의 표시) 기준',
-                  '피로 주의: 빈도 3.5 이상 + 성과 약세(손익분기 근처거나 하락 중)일 때만',
-                  '노출 못 받음: 세트 노출 3천↑·소재 2개↑인데 이 소재 점유율 10% 미만 — 평가 불가 상태',
-                  '클릭률 낮음: 노출 3천↑ & CTR 0.5% 미만 — 후킹 문제',
-                  '전환 퍼널 의심: 클릭 50↑ & GA4·픽셀 구매 모두 0 — 상세페이지 문제',
-                  '분류(OFF·개선·증액 등) 기준은 각 섹션 뱃지 옆 i 참고',
-                ]}/>
+                <button onClick={() => setShowCriteria(true)}
+                  className="px-3 py-1.5 rounded-lg bg-gray-900 text-white text-xs font-bold hover:bg-gray-700">
+                  📋 판정 기준표
+                </button>
               </p>
             )}
           </div>
