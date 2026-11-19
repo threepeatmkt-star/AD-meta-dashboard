@@ -82,6 +82,7 @@ function DecisionCard({ item, brand, decision, onDecide, adAccountId }) {
           <div className="text-right shrink-0">
             <p className="text-2xl font-extrabold leading-tight" style={{ color: cat.color }}>{item.roas}%</p>
             <p className="text-sm text-gray-500 font-semibold mt-0.5">광고비 {man(item.spend)}</p>
+            <p className="text-sm text-gray-500 font-semibold mt-0.5">매출 {item.revenue > 0 ? man(item.revenue) : '0원'}</p>
             <p className="text-xs text-gray-300 mt-1">{open ? '▲ 접기' : '▼ 근거·결정'}</p>
           </div>
         </div>
