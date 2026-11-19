@@ -48,6 +48,16 @@ function AdPath({ item, size = 'md' }) {
   );
 }
 
+function InfoTip({ lines }) {
+  return (
+    <span className="relative group cursor-help inline-flex items-center justify-center w-5 h-5 rounded-full bg-gray-300 text-white text-[11px] font-bold leading-none shrink-0">i
+      <span className="absolute top-full left-1/2 -translate-x-1/2 mt-2 hidden group-hover:block w-80 bg-gray-900 text-white text-xs font-medium rounded-xl px-4 py-3 leading-relaxed z-40 shadow-xl whitespace-normal text-left">
+        {lines.map((l, i) => <span key={i} className="block mb-1.5 last:mb-0">{l}</span>)}
+      </span>
+    </span>
+  );
+}
+
 function DecisionCard({ item, brand, decision, onDecide, adAccountId }) {
   const [open, setOpen] = useState(false);
   const [memo, setMemo] = useState(decision?.memo || '');
@@ -238,6 +248,39 @@ export default function DecisionBoard({ brand }) {
   const undecided = items.filter(i => !decisions[i.adId] && (i.category === 'off' || i.category === 'fix' || i.category === 'scale'));
   const decidedCount = items.filter(i => decisions[i.adId]).length;
 
+  const bk = data?.breakeven || 300;
+  const CAT_RULES = {
+    off: [
+      `기준: ROAS가 손익분기(${bk}%)의 60% 미만 (${Math.round(bk * 0.6)}% 미만)`,
+      '광고비를 쓸수록 손해가 커지는 구간이에요',
+    ],
+    fix: [
+      `기준: ROAS가 손익분기(${bk}%)의 60%~120% 사이`,
+      '또는 기간 전반 → 후반 ROAS가 40% 이상 급락',
+      '이익 여유가 없거나 효율이 꺾이는 중이에요',
+    ],
+    scale: [
+      `기준: ROAS가 손익분기(${bk}%)의 2배 이상 (${bk * 2}% 이상)`,
+      '그리고 기간 후반에도 손익분기 위를 유지',
+      '효율이 검증됐고 아직 안 꺾임 — 예산을 늘려볼 후보예요',
+    ],
+    keep: [
+      `기준: ROAS가 손익분기(${bk}%)의 1.2배~2배 사이`,
+      '안정적으로 이익은 나지만 증액 근거까진 아니에요',
+    ],
+    hold: [
+      '기준: 광고비 3만원 미만이면서 클릭 50회 미만',
+      '데이터가 적어 지금 판단하면 틀릴 확률이 높아요',
+      '광고비 3만원 또는 클릭 50회가 쌓이면 자동 판단돼요',
+    ],
+  };
+  const ERROR_RULES = [
+    'UTM 없음: 랜딩 URL·URL 매개변수 어디에도 utm이 없음',
+    'UTM 비표준: utm_medium이 cpm이 아님',
+    'GA4 매출 0: 픽셀엔 매출이 찍히는데 GA4는 0원 (광고비 3만원 이상만)',
+    'UTM 확인 불가: 파트너십 광고 등 URL을 API로 못 읽고, GA4 유입도 없음',
+  ];
+
   const PRESETS = [{ v: 'last7', l: '최근 7일' }, { v: 'last14', l: '최근 14일' }, { v: 'last30', l: '최근 30일' }, { v: 'thisMonth', l: '이번 달' }, { v: 'lastMonth', l: '지난 달' }];
 
   return (
@@ -376,6 +419,7 @@ export default function DecisionBoard({ brand }) {
           <section id="sec-errors" className="mb-8 scroll-mt-32">
             <div className="flex items-center gap-2 mb-3">
               <span className="px-3.5 py-1.5 rounded-full text-base font-extrabold text-white bg-red-600">🚨 설정 오류 {errorItems.length}</span>
+              <InfoTip lines={ERROR_RULES}/>
               <p className="text-sm text-gray-400">UTM 누락·비표준, GA4 추적 불일치 — 숫자가 새는 원인부터 고쳐요</p>
             </div>
             <div className="space-y-2">
@@ -424,6 +468,7 @@ export default function DecisionBoard({ brand }) {
             <section key={cat} id={`sec-${cat}`} className="mb-8 scroll-mt-32">
               <div className="flex items-center gap-2 mb-3">
                 <span className="px-3.5 py-1.5 rounded-full text-base font-extrabold text-white" style={{ background: c.color }}>{c.emoji} {c.label} {group.length}</span>
+                <InfoTip lines={CAT_RULES[cat]}/>
                 <p className="text-sm text-gray-400">{c.desc}</p>
               </div>
               <div className="space-y-3">
