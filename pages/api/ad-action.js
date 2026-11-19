@@ -26,7 +26,10 @@ export default async function handler(req, res) {
       const { data: aset } = await axios.get(`${META}/${adsetId}`, { params: { fields: 'daily_budget,name', access_token: cfg.metaToken }, timeout: 20000 });
       const cur = parseInt(aset.daily_budget) || 0;
       if (!cur) return res.status(400).json({ error: '이 광고세트는 일예산이 없어요(캠페인 예산·CBO 방식) — 광고관리자에서 캠페인 예산을 조정해주세요' });
-      const next = Math.max(1000, Math.round(cur * (action === 'budget_down' ? 0.7 : 1.3) / 100) * 100);
+      // 운영 룰: 만원 단위 증감, 최소 1만원
+      if (action === 'budget_down' && cur <= 10000)
+        return res.status(400).json({ error: '이미 최소 일예산(1만원)이에요 — 더 줄이는 대신 소재 끄기를 검토해주세요' });
+      const next = action === 'budget_down' ? Math.max(10000, cur - 10000) : cur + 10000;
       await axios.post(`${META}/${adsetId}`, null, { params: { daily_budget: next, access_token: cfg.metaToken }, timeout: 20000 });
       return res.json({ ok: true, message: `광고세트 '${aset.name}' 일예산 ₩${cur.toLocaleString('ko-KR')} → ₩${next.toLocaleString('ko-KR')} 변경 완료` });
     }

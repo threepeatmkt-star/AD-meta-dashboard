@@ -77,8 +77,8 @@ function DecisionCard({ item, brand, decision, onDecide, adAccountId, onReload }
     const what = act === 'pause_ad'
       ? `소재 "${item.adName}"를 메타에서 실제로 OFF(일시중지)`
       : act === 'budget_down'
-        ? `광고세트 "${item.adsetName}" 일예산을 30% 축소${item.dailyBudget ? ` (${man(item.dailyBudget)} → ${man(item.dailyBudget * 0.7)})` : ''}`
-        : `광고세트 "${item.adsetName}" 일예산을 30% 증액${item.dailyBudget ? ` (${man(item.dailyBudget)} → ${man(item.dailyBudget * 1.3)})` : ''}`;
+        ? `광고세트 "${item.adsetName}" 일예산 1만원 축소${item.dailyBudget ? ` (${man(item.dailyBudget)} → ${man(Math.max(10000, item.dailyBudget - 10000))})` : ''}`
+        : `광고세트 "${item.adsetName}" 일예산 1만원 증액${item.dailyBudget ? ` (${man(item.dailyBudget)} → ${man(item.dailyBudget + 10000)})` : ''}`;
     if (!window.confirm(`${what} — 진행할까요?`)) return;
     setApplying(opt);
     try {
