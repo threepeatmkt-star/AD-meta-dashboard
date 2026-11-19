@@ -60,15 +60,26 @@ async function brandCheck(b, ga4Token) {
 
     const hasGtag = /googletagmanager\.com\/gtag\/js\?id=G-|gtag\s*\(\s*['"]config['"]\s*,\s*['"]G-/.test(html);
     const ga4Id = (html.match(/G-[A-Z0-9]{6,12}/) || [])[0];
-    const hasGtm = /googletagmanager\.com\/gtm\.js|GTM-[A-Z0-9]{4,10}/.test(html);
-    checks.push({
-      name: 'GA4 설치', status: hasGtag ? 'ok' : hasGtm ? 'warn' : 'fail',
-      detail: hasGtag
-        ? `GA4 태그 확인됨${ga4Id ? ` (측정 ID: ${ga4Id})` : ''}`
-        : hasGtm
-          ? 'GA4 직접 태그는 안 보이지만 GTM(태그매니저)이 있어요 — GTM 안에 GA4가 들어있는지 확인 필요'
-          : 'GA4/GTM 스크립트를 찾지 못했어요 — 설치 확인 필요',
-    });
+    const gtmId = (html.match(/GTM-[A-Z0-9]{4,10}/) || [])[0];
+
+    if (hasGtag) {
+      checks.push({ name: 'GA4 설치', status: 'ok', detail: `GA4 태그 확인됨${ga4Id ? ` (측정 ID: ${ga4Id})` : ''}` });
+    } else if (gtmId) {
+      // GTM 컨테이너 파일을 직접 열어 그 안에 GA4 태그가 있는지 검사
+      let gtmGa4Ids = [];
+      try {
+        const { data: gtmJs } = await axios.get(`https://www.googletagmanager.com/gtm.js?id=${gtmId}`, { timeout: 15000 });
+        gtmGa4Ids = [...new Set(String(gtmJs).match(/G-[A-Z0-9]{6,12}/g) || [])];
+      } catch {}
+      checks.push({
+        name: 'GA4 설치', status: gtmGa4Ids.length ? 'ok' : 'warn',
+        detail: gtmGa4Ids.length
+          ? `GTM(${gtmId}) 컨테이너 안에서 GA4 태그 확인됨 (측정 ID: ${gtmGa4Ids.join(', ')}) — GTM 경유로 정상 설치`
+          : `GTM(${gtmId})은 있지만 컨테이너 안에서 GA4 측정 ID를 찾지 못했어요 — GTM 작업공간에서 GA4 구성 태그가 게시됐는지 확인 필요`,
+      });
+    } else {
+      checks.push({ name: 'GA4 설치', status: 'fail', detail: 'GA4/GTM 스크립트를 찾지 못했어요 — 설치 확인 필요' });
+    }
   }
 
   // ③ 픽셀 vs GA4 괴리 (최근 7일)
