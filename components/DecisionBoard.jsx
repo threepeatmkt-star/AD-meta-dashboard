@@ -402,7 +402,19 @@ export default function DecisionBoard({ brand }) {
           <div className="ml-auto flex items-center gap-3">
             <input value={q} onChange={e => setQ(e.target.value)} placeholder="🔍 캠페인·광고세트·소재 검색"
               className="border border-gray-200 rounded-xl px-4 py-2 text-sm w-56 focus:outline-none focus:ring-2 focus:ring-amber-300"/>
-            {data && <p className="text-sm text-gray-500 whitespace-nowrap hidden md:block">손익분기 ROAS <b className="text-gray-800">{data.breakeven}%</b> (ERP 원가 기준)</p>}
+            {data && (
+              <p className="text-sm text-gray-500 whitespace-nowrap hidden md:flex items-center gap-1.5">
+                손익분기 ROAS <b className="text-gray-800">{data.breakeven}%</b> (ERP 원가 기준)
+                <InfoTip lines={[
+                  '⚠ 플래그(주의 표시) 기준',
+                  '피로 주의: 빈도 3.5 이상 + 성과 약세(손익분기 근처거나 하락 중)일 때만',
+                  '노출 못 받음: 세트 노출 3천↑·소재 2개↑인데 이 소재 점유율 10% 미만 — 평가 불가 상태',
+                  '클릭률 낮음: 노출 3천↑ & CTR 0.5% 미만 — 후킹 문제',
+                  '전환 퍼널 의심: 클릭 50↑ & GA4·픽셀 구매 모두 0 — 상세페이지 문제',
+                  '분류(OFF·개선·증액 등) 기준은 각 섹션 뱃지 옆 i 참고',
+                ]}/>
+              </p>
+            )}
           </div>
         </div>
         {useCustom && customStart && customEnd && rangeDays(customStart, customEnd) < 7 && (

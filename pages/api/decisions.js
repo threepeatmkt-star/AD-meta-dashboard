@@ -244,6 +244,10 @@ export default async function handler(req, res) {
         category = 'hold';
         reason = `광고비 ${(Math.round(ad.spend / 1000) / 10).toLocaleString('ko-KR')}만원 · 클릭 ${ad.clicks}회 — 아직 데이터가 적어요 (광고비 3만원 또는 클릭 50회가 쌓이면 자동 판단돼요)`;
         options = ['더 지켜보기', '끄기'];
+      } else if (flags.some(fl => fl.k === 'lowDelivery') && r < breakeven) {
+        category = 'hold';
+        reason = `세트 내 노출 점유율이 낮아 성과 평가가 불가능해요 — ROAS ${r}%는 소재 탓이 아니라 노출을 못 받은 탓일 수 있어요`;
+        options = ['단독 세트로 분리 검토', '더 지켜보기', '끄기'];
       } else if (r < breakeven * 0.6) {
         category = 'off';
         reason = `ROAS ${r}%로 손익분기(${breakeven}%)의 60% 미만 — 쓸수록 손해`;
