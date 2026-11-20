@@ -68,18 +68,30 @@ const REAL_ACTIONS = { '끄기': 'pause_ad', '예산 축소': 'budget_down', '�
 /* 🏆 확장 추천 카드 — 장수 고효율 승자 소재. 브리프 복사 → Claude 채팅에 붙여넣으면 유사 구조 신규 소재 제작 */
 function WinnerCard({ item, period, adAccountId }) {
   const [copied, setCopied] = useState(false);
-  const brief = [
-    '[소재 확장 브리프]',
-    `승자 소재: ${item.adName}`,
+  const head = [
+    item.isVideo ? '[영상 소재 확장 브리프]' : '[이미지 소재 확장 브리프]',
+    `승자 소재: ${item.adName} (${item.isVideo ? '영상' : '이미지'})`,
     `위치: ${item.campaignName} › ${item.adsetName}`,
     `성과(${period.start}~${period.end}): 광고비 ${krw(item.spend)} · GA4 매출 ${krw(item.revenue)} · ROAS ${item.roas}% · 운영 ${item.ageDays}일째`,
     item.thumbnail ? `썸네일: ${item.thumbnail}` : null,
     '---',
+  ];
+  const body = item.isVideo ? [
     '확장 제품명: ',
-    '소구포인트: ',
+    '소구포인트 (1~3개): ',
     '오퍼(가격/구성): ',
+    '촬영 소스: (체험단·선수 실촬영본 첨부 / 없으면 "없음")',
+    '원본 승자 영상 파일: (광고관리자에서 받아 첨부 — 구조 분석용)',
+    '길이: 15초 / 비율: 9:16 (릴스·스토리)',
+    '엔딩: 블랙 전환 + 브랜드 로고',
+  ] : [
+    '확장 제품명: ',
+    '소구포인트 (1~3개): ',
+    '오퍼(가격/구성 — 수량 꼭 기재, 예: 24캔): ',
+    '제품 누끼 PNG: (첨부)',
     '비율: 1:1 / 변형 수: 3종',
-  ].filter(Boolean).join('\n');
+  ];
+  const brief = [...head, ...body].filter(Boolean).join('\n');
 
   const copy = async () => {
     try { await navigator.clipboard.writeText(brief); }
@@ -99,7 +111,12 @@ function WinnerCard({ item, period, adAccountId }) {
           : <div className="w-20 h-20 rounded-xl bg-gray-100 shrink-0 flex items-center justify-center text-gray-300 text-[10px]">이미지<br/>없음</div>}
         <div className="min-w-0 flex-1">
           <AdPath item={item} size="sm"/>
-          <p className="text-lg font-extrabold text-gray-900 mt-1">🏆 {item.adName}</p>
+          <p className="text-lg font-extrabold text-gray-900 mt-1 flex items-center gap-2">
+            🏆 {item.adName}
+            <span className={`px-2 py-0.5 rounded-md text-xs font-bold ${item.isVideo ? 'bg-purple-50 text-purple-700' : 'bg-sky-50 text-sky-700'}`}>
+              {item.isVideo ? '🎬 영상' : '🖼 이미지'}
+            </span>
+          </p>
           <p className="text-[15px] text-gray-600 mt-1.5 leading-relaxed">
             운영 <b>{item.ageDays}일째</b> · ROAS <b className="text-amber-600">{item.roas}%</b> (손익분기 2배 이상)
             {item.secondHalf ? <> · 후반에도 <b>{item.secondHalf.roas}%</b> 유지</> : null}

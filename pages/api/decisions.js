@@ -80,7 +80,9 @@ async function getAdTags(cfg) {
       ];
       const thumb = oss.video_data?.image_url || oss.link_data?.picture || afs.images?.[0]?.url
         || afs.videos?.[0]?.thumbnail_url || c.image_url || c.thumbnail_url || null;
-      return [r.id, { tags: parts.join(' ').trim(), thumb, createdTime: r.created_time || null }];
+      // 영상 소재 판별: 단일 영상(video_data) 또는 다이내믹 소재에 영상 에셋 포함
+      const isVideo = !!(oss.video_data || (afs.videos && afs.videos.length));
+      return [r.id, { tags: parts.join(' ').trim(), thumb, createdTime: r.created_time || null, isVideo }];
     }));
   } catch { return {}; }
 }
@@ -283,6 +285,7 @@ export default async function handler(req, res) {
         adId: ad.adId, adName: ad.adName, campaignName: ad.campaignName, adsetName: ad.adsetName,
         adsetId: ad.adsetId, thumbnail: adMeta.thumb || null,
         ageDays, winner,
+        isVideo: !!adMeta.isVideo || /video|reels|릴스/i.test(ad.adName || ''),
         dailyBudget: budgets.adset[ad.adsetId] || 0,
         campaignDailyBudget: budgets.campaign[ad.campaignId] || 0,
         spend: Math.round(ad.spend), revenue: Math.round(revenue), roas: r, clicks: ad.clicks,
