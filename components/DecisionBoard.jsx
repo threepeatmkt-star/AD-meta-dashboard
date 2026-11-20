@@ -65,6 +65,65 @@ function InfoTip({ lines }) {
 
 const REAL_ACTIONS = { '끄기': 'pause_ad', '예산 축소': 'budget_down', '예산 증액': 'budget_up' };
 
+/* 🏆 확장 추천 카드 — 장수 고효율 승자 소재. 브리프 복사 → Claude 채팅에 붙여넣으면 유사 구조 신규 소재 제작 */
+function WinnerCard({ item, period, adAccountId }) {
+  const [copied, setCopied] = useState(false);
+  const brief = [
+    '[소재 확장 브리프]',
+    `승자 소재: ${item.adName}`,
+    `위치: ${item.campaignName} › ${item.adsetName}`,
+    `성과(${period.start}~${period.end}): 광고비 ${krw(item.spend)} · GA4 매출 ${krw(item.revenue)} · ROAS ${item.roas}% · 운영 ${item.ageDays}일째`,
+    item.thumbnail ? `썸네일: ${item.thumbnail}` : null,
+    '---',
+    '확장 제품명: ',
+    '소구포인트: ',
+    '오퍼(가격/구성): ',
+    '비율: 1:1 / 변형 수: 3종',
+  ].filter(Boolean).join('\n');
+
+  const copy = async () => {
+    try { await navigator.clipboard.writeText(brief); }
+    catch {
+      const ta = document.createElement('textarea');
+      ta.value = brief; document.body.appendChild(ta); ta.select();
+      document.execCommand('copy'); document.body.removeChild(ta);
+    }
+    setCopied(true); setTimeout(() => setCopied(false), 2500);
+  };
+
+  return (
+    <div className="rounded-2xl bg-white border-2 border-amber-300 px-5 py-4">
+      <div className="flex items-start gap-4">
+        {item.thumbnail
+          ? <img src={item.thumbnail} alt="" className="w-20 h-20 rounded-xl object-cover border border-amber-100 shrink-0 bg-gray-50"/>
+          : <div className="w-20 h-20 rounded-xl bg-gray-100 shrink-0 flex items-center justify-center text-gray-300 text-[10px]">이미지<br/>없음</div>}
+        <div className="min-w-0 flex-1">
+          <AdPath item={item} size="sm"/>
+          <p className="text-lg font-extrabold text-gray-900 mt-1">🏆 {item.adName}</p>
+          <p className="text-[15px] text-gray-600 mt-1.5 leading-relaxed">
+            운영 <b>{item.ageDays}일째</b> · ROAS <b className="text-amber-600">{item.roas}%</b> (손익분기 2배 이상)
+            {item.secondHalf ? <> · 후반에도 <b>{item.secondHalf.roas}%</b> 유지</> : null}
+            {' '}— 검증된 구조예요. 이 공식으로 다른 제품 소재를 확장해보세요.
+          </p>
+          <p className="text-sm text-gray-400 mt-1">광고비 {man(item.spend)} · 매출 {man(item.revenue)} · 클릭 {(item.clicks || 0).toLocaleString('ko-KR')}회 (CTR {item.ctr}%)</p>
+        </div>
+        <div className="shrink-0 flex flex-col gap-2">
+          <button onClick={copy}
+            className={`px-4 py-2.5 rounded-xl text-sm font-bold text-white shadow-sm transition-colors ${copied ? 'bg-emerald-600' : 'bg-amber-500 hover:bg-amber-600'}`}>
+            {copied ? '✓ 복사됨!' : '📋 확장 브리프 복사'}
+          </button>
+          {adAccountId && (
+            <a href={adsManagerUrl(adAccountId, item.adId)} target="_blank" rel="noreferrer"
+              className="px-4 py-2 rounded-xl text-sm font-bold border-2 border-gray-200 text-gray-600 hover:border-gray-400 bg-white text-center whitespace-nowrap">
+              광고관리자 ↗
+            </a>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function DecisionCard({ item, brand, decision, onDecide, adAccountId, onReload, siblingCount }) {
   const [open, setOpen] = useState(false);
   const [memo, setMemo] = useState(decision?.memo || '');
@@ -274,6 +333,12 @@ function CriteriaModal({ bk, onClose }) {
             ['🚨 UTM 비표준', 'utm_medium이 cpm이 아님'],
             ['🚨 GA4 매출 0', '수동 UTM + 자동 태그(광고ID 매핑) 합쳐도 GA4 0원인데 픽셀엔 매출 있음'],
             ['🚨 UTM 확인 불가', '파트너십 광고라 URL을 API로 못 읽고 GA4 유입도 없음'],
+          ]}/>
+
+        <Table title="④ 확장 추천(🏆) — 분류와 별개, 복제할 승자 소재 표시"
+          head={['표시', '조건', '의미']}
+          rows={[
+            ['🏆 확장 추천', `운영 30일↑ + 기간 광고비 5만원↑ + ROAS ${bk * 2}%↑ + 후반에도 손익분기 유지`, '장수인데 효율이 안 꺾이는 검증된 소재 — 브리프 복사 → Claude 채팅에 붙여넣으면 같은 구조로 다른 제품 소재를 확장 제작'],
           ]}/>
 
         <p className="text-xs text-gray-400">기준값 변경은 관리자에게 요청 (손익분기: lib/brands.js · 임계값: pages/api/decisions.js)</p>
@@ -499,7 +564,12 @@ export default function DecisionBoard({ brand }) {
 
         {/* 요약 타일 */}
         {data && (
-          <div className="grid grid-cols-3 sm:grid-cols-6 gap-3 mb-6 md:sticky md:top-[134px] md:z-10 bg-slate-50/95 backdrop-blur-sm py-2 -my-2 rounded-xl">
+          <div className="grid grid-cols-3 sm:grid-cols-7 gap-3 mb-6 md:sticky md:top-[134px] md:z-10 bg-slate-50/95 backdrop-blur-sm py-2 -my-2 rounded-xl">
+            <button onClick={() => scrollTo('sec-winners')}
+              className="rounded-2xl bg-white border-2 border-amber-300 px-4 py-3 text-center hover:shadow-md hover:-translate-y-0.5 transition-all">
+              <p className="text-2xl font-extrabold text-amber-500">{data.summary.winners || 0}</p>
+              <p className="text-xs font-bold text-gray-500 mt-0.5">🏆 확장 추천</p>
+            </button>
             <button onClick={() => scrollTo('sec-errors')}
               className="rounded-2xl bg-white border-2 border-red-200 px-4 py-3 text-center hover:shadow-md hover:-translate-y-0.5 transition-all">
               <p className="text-2xl font-extrabold text-red-600">{data.summary.errorAds || 0}</p>
@@ -537,6 +607,26 @@ export default function DecisionBoard({ brand }) {
               <p className="mt-3 text-sm text-gray-500">{loading ? '점검 중…' : '🎉 결정할 항목을 모두 처리했어요.'}</p>
             )}
           </div>
+        )}
+
+        {/* 🏆 확장 추천 (승자 소재) */}
+        {items.filter(i => i.winner).filter(matchQ).length > 0 && data && (
+          <section id="sec-winners" className="mb-8 scroll-mt-32">
+            <div className="flex items-center gap-2 mb-3">
+              <span className="px-3.5 py-1.5 rounded-full text-base font-extrabold text-white bg-amber-500">🏆 확장 추천 {items.filter(i => i.winner).filter(matchQ).length}</span>
+              <InfoTip lines={[
+                '기준: 운영 30일 이상 + 기간 광고비 5만원 이상',
+                `+ ROAS 손익분기(${bk}%)의 2배 이상 + 기간 후반에도 손익분기 유지`,
+                '오래 돌아도 효율이 안 꺾이는 검증된 승자 — 이 구조를 복제해 다른 제품으로 확장할 후보예요',
+              ]}/>
+              <p className="text-sm text-gray-400">브리프 복사 → Claude 채팅에 붙여넣으면 같은 구조의 신규 소재를 만들어줘요</p>
+            </div>
+            <div className="space-y-3">
+              {items.filter(i => i.winner).filter(matchQ).map(item => (
+                <WinnerCard key={item.adId} item={item} period={data.period} adAccountId={data.adAccountId}/>
+              ))}
+            </div>
+          </section>
         )}
 
         {/* 설정 오류 점검 */}

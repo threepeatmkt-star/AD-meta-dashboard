@@ -63,7 +63,7 @@ async function getMetaAds(cfg, startDate, endDate) {
 async function getAdTags(cfg) {
   try {
     const rows = await fetchMetaPages(`${META_BASE}/act_${cfg.adAccountId}/ads`, {
-      fields: 'id,creative{url_tags,thumbnail_url,image_url,object_story_spec{link_data{link,picture},video_data{call_to_action,image_url}},asset_feed_spec{link_urls,images{url},videos{thumbnail_url}}}',
+      fields: 'id,created_time,creative{url_tags,thumbnail_url,image_url,object_story_spec{link_data{link,picture},video_data{call_to_action,image_url}},asset_feed_spec{link_urls,images{url},videos{thumbnail_url}}}',
       thumbnail_width: 300, thumbnail_height: 300,
       filtering: JSON.stringify([{ field: 'effective_status', operator: 'IN', value: ['ACTIVE'] }]),
       limit: 200, access_token: cfg.metaToken,
@@ -80,7 +80,7 @@ async function getAdTags(cfg) {
       ];
       const thumb = oss.video_data?.image_url || oss.link_data?.picture || afs.images?.[0]?.url
         || afs.videos?.[0]?.thumbnail_url || c.image_url || c.thumbnail_url || null;
-      return [r.id, { tags: parts.join(' ').trim(), thumb }];
+      return [r.id, { tags: parts.join(' ').trim(), thumb, createdTime: r.created_time || null }];
     }));
   } catch { return {}; }
 }
@@ -268,9 +268,21 @@ export default async function handler(req, res) {
         options = ['유지', '예산 증액', '보류'];
       }
 
+      // ── 🏆 확장 추천 (승자 소재) 판정 ──
+      // 기준: 운영 30일 이상 + 기간 광고비 5만원 이상 + ROAS 손익분기 2배 이상 + 후반에도 손익분기 유지
+      const ageDays = adMeta.createdTime
+        ? Math.floor((Date.now() - new Date(adMeta.createdTime).getTime()) / 86400000)
+        : null;
+      const winner =
+        ageDays != null && ageDays >= 30 &&
+        ad.spend >= 50000 &&
+        r >= breakeven * 2 &&
+        (roasB == null || roasB >= breakeven);
+
       return {
         adId: ad.adId, adName: ad.adName, campaignName: ad.campaignName, adsetName: ad.adsetName,
         adsetId: ad.adsetId, thumbnail: adMeta.thumb || null,
+        ageDays, winner,
         dailyBudget: budgets.adset[ad.adsetId] || 0,
         campaignDailyBudget: budgets.campaign[ad.campaignId] || 0,
         spend: Math.round(ad.spend), revenue: Math.round(revenue), roas: r, clicks: ad.clicks,
@@ -296,6 +308,7 @@ export default async function handler(req, res) {
         belowBreakeven: items.filter(i => i.spend >= MIN_SPEND && i.roas < breakeven).length,
         activeAds: items.length,
         errorAds: items.filter(i => i.errors.length > 0).length,
+        winners: items.filter(i => i.winner).length,
       },
       items,
     });
