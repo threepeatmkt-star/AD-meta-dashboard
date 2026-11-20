@@ -565,15 +565,15 @@ export default function DecisionBoard({ brand }) {
         {/* 요약 타일 */}
         {data && (
           <div className="grid grid-cols-3 sm:grid-cols-7 gap-3 mb-6 md:sticky md:top-[134px] md:z-10 bg-slate-50/95 backdrop-blur-sm py-2 -my-2 rounded-xl">
-            <button onClick={() => scrollTo('sec-winners')}
-              className="rounded-2xl bg-white border-2 border-amber-300 px-4 py-3 text-center hover:shadow-md hover:-translate-y-0.5 transition-all">
-              <p className="text-2xl font-extrabold text-amber-500">{data.summary.winners || 0}</p>
-              <p className="text-xs font-bold text-gray-500 mt-0.5">🏆 확장 추천</p>
-            </button>
             <button onClick={() => scrollTo('sec-errors')}
               className="rounded-2xl bg-white border-2 border-red-200 px-4 py-3 text-center hover:shadow-md hover:-translate-y-0.5 transition-all">
               <p className="text-2xl font-extrabold text-red-600">{data.summary.errorAds || 0}</p>
               <p className="text-xs font-bold text-gray-500 mt-0.5">🚨 설정 오류</p>
+            </button>
+            <button onClick={() => scrollTo('sec-winners')}
+              className="rounded-2xl bg-white border-2 border-amber-300 px-4 py-3 text-center hover:shadow-md hover:-translate-y-0.5 transition-all">
+              <p className="text-2xl font-extrabold text-amber-500">{data.summary.winners || 0}</p>
+              <p className="text-xs font-bold text-gray-500 mt-0.5">🏆 확장 추천</p>
             </button>
             {CAT_ORDER.map(c => (
               <button key={c} onClick={() => scrollTo(`sec-${c}`)}
@@ -607,26 +607,6 @@ export default function DecisionBoard({ brand }) {
               <p className="mt-3 text-sm text-gray-500">{loading ? '점검 중…' : '🎉 결정할 항목을 모두 처리했어요.'}</p>
             )}
           </div>
-        )}
-
-        {/* 🏆 확장 추천 (승자 소재) */}
-        {items.filter(i => i.winner).filter(matchQ).length > 0 && data && (
-          <section id="sec-winners" className="mb-8 scroll-mt-32">
-            <div className="flex items-center gap-2 mb-3">
-              <span className="px-3.5 py-1.5 rounded-full text-base font-extrabold text-white bg-amber-500">🏆 확장 추천 {items.filter(i => i.winner).filter(matchQ).length}</span>
-              <InfoTip lines={[
-                '기준: 운영 30일 이상 + 기간 광고비 5만원 이상',
-                `+ ROAS 손익분기(${bk}%)의 2배 이상 + 기간 후반에도 손익분기 유지`,
-                '오래 돌아도 효율이 안 꺾이는 검증된 승자 — 이 구조를 복제해 다른 제품으로 확장할 후보예요',
-              ]}/>
-              <p className="text-sm text-gray-400">브리프 복사 → Claude 채팅에 붙여넣으면 같은 구조의 신규 소재를 만들어줘요</p>
-            </div>
-            <div className="space-y-3">
-              {items.filter(i => i.winner).filter(matchQ).map(item => (
-                <WinnerCard key={item.adId} item={item} period={data.period} adAccountId={data.adAccountId}/>
-              ))}
-            </div>
-          </section>
         )}
 
         {/* 설정 오류 점검 */}
@@ -669,6 +649,26 @@ export default function DecisionBoard({ brand }) {
                     </div>
                   ))}
                 </div>
+              ))}
+            </div>
+          </section>
+        )}
+
+        {/* 🏆 확장 추천 (승자 소재) — 설정 오류 다음, OFF 검토 앞 */}
+        {items.filter(i => i.winner).filter(matchQ).length > 0 && data && (
+          <section id="sec-winners" className="mb-8 scroll-mt-32">
+            <div className="flex items-center gap-2 mb-3">
+              <span className="px-3.5 py-1.5 rounded-full text-base font-extrabold text-white bg-amber-500">🏆 확장 추천 {items.filter(i => i.winner).filter(matchQ).length}</span>
+              <InfoTip lines={[
+                '기준: 운영 30일 이상 + 기간 광고비 5만원 이상',
+                `+ ROAS 손익분기(${bk}%)의 2배 이상 + 기간 후반에도 손익분기 유지`,
+                '오래 돌아도 효율이 안 꺾이는 검증된 승자 — 이 구조를 복제해 다른 제품으로 확장할 후보예요',
+              ]}/>
+              <p className="text-sm text-gray-400">브리프 복사 → Claude 채팅에 붙여넣으면 같은 구조의 신규 소재를 만들어줘요</p>
+            </div>
+            <div className="space-y-3">
+              {items.filter(i => i.winner).filter(matchQ).map(item => (
+                <WinnerCard key={item.adId} item={item} period={data.period} adAccountId={data.adAccountId}/>
               ))}
             </div>
           </section>
