@@ -296,6 +296,69 @@ function DecisionCard({ item, brand, decision, onDecide, adAccountId, onReload, 
   );
 }
 
+/* 📖 소재 확장 가이드 — 팀 누구나 같은 순서로 제작할 수 있게 */
+function GuideModal({ onClose }) {
+  const Step = ({ n, children }) => (
+    <li className="flex gap-3">
+      <span className="shrink-0 w-6 h-6 rounded-full bg-amber-500 text-white text-xs font-bold flex items-center justify-center mt-0.5">{n}</span>
+      <span className="text-[15px] text-gray-700 leading-relaxed">{children}</span>
+    </li>
+  );
+  const Box = ({ title, children }) => (
+    <div className="rounded-2xl border border-gray-200 p-5 mb-4">
+      <p className="text-base font-extrabold text-gray-900 mb-3">{title}</p>
+      {children}
+    </div>
+  );
+  return (
+    <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/40 p-4 overflow-y-auto" onClick={onClose}>
+      <div className="bg-white rounded-2xl shadow-2xl max-w-3xl w-full my-8 p-6" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between mb-5">
+          <p className="text-xl font-extrabold text-gray-900">📖 소재 확장 가이드</p>
+          <button onClick={onClose} className="w-9 h-9 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-500 font-bold">✕</button>
+        </div>
+
+        <Box title="🖼 이미지 소재 — 승자 구조 복제">
+          <ol className="space-y-2.5">
+            <Step n="1">기간을 <b>최근 30일</b>로 두고 🏆 확장 추천에서 <b>🖼 이미지</b> 소재 선택 (짧은 기간은 반짝 소재가 섞임)</Step>
+            <Step n="2"><b>[📋 확장 브리프 복사]</b> 클릭</Step>
+            <Step n="3">Claude 채팅(프로젝트: 나형 - 메타광고 대시보드)에 붙여넣고 빈칸 작성 — 확장 제품명 · 소구포인트 1~3개 · 오퍼 (<b>수량 필수</b>, 예: 24캔 22,900원)</Step>
+            <Step n="4"><b>제품 누끼 PNG 첨부</b> (폰트는 구글 드라이브 폰트 폴더에서 자동 사용 — 첨부 불필요)</Step>
+            <Step n="5">1:1 시안 3종 수령 → 수정 사항만 말하면 즉시 재렌더 (크레딧 0)</Step>
+            <Step n="6">확정본 메타 업로드 → 다음 주부터 광고 진단에서 노출·성과 확인</Step>
+          </ol>
+        </Box>
+
+        <Box title="🎬 영상 소재 — 실촬영본 편집이 메인">
+          <p className="text-sm font-bold text-gray-900 mb-2">① 실촬영본 + 편집 (메인)</p>
+          <ul className="text-[15px] text-gray-700 leading-relaxed space-y-1.5 mb-4 pl-1">
+            <li>• <b>후원선수 PPL 편집</b> — 릴스형. 상단 후킹 2줄 + 하단 제품·쿠폰가 카드</li>
+            <li>• <b>체험단 블로그 영상/GIF 컷편집</b> — Claude가 네이버에서 체험단 글만 수집 → 4컷 × 3~4초 + 자막 + 오퍼 뱃지. <b>출처 표기 필수</b> ("출처: 네이버 블로그 ○○")</li>
+            <li>• <b>직접 촬영본</b> — 원본 파일 첨부하면 같은 방식으로 편집</li>
+          </ul>
+          <p className="text-sm font-bold text-gray-900 mb-2">② AI 영상 (서브)</p>
+          <ul className="text-[15px] text-gray-700 leading-relaxed space-y-1.5 pl-1">
+            <li>• 제품 클로즈업 B롤 · 엔딩 제작 전용</li>
+            <li>• 유사 제품군 템플릿이 있을 때만 제품(+배경) 교체 — <b>완전 신규 생성 금지</b> (AI티 남)</li>
+          </ul>
+          <p className="text-sm text-gray-500 mt-3">요청 방법: 🎬 영상 소재의 확장 브리프 복사 → 채팅에 붙여넣기 → 제품명·소구포인트·오퍼 작성 (체험단 수집은 Claude가 진행)</p>
+        </Box>
+
+        <Box title="✅ 공통 규칙">
+          <ul className="text-[15px] text-gray-700 leading-relaxed space-y-1.5 pl-1">
+            <li>• 성분 수치는 <b>제품 라벨에 실제 표기된 것만</b></li>
+            <li>• 과대광고 금지: 치료·완치·의약품 효능 표현 불가, 체중 감량 암시 회피</li>
+            <li>• 구성 수량(24캔 등) 반드시 노출 — 가격만 쓰면 단품가로 오해</li>
+            <li>• 엔딩은 <b>제품/브랜드별 전용</b> 사용 (바이퍼 엔딩을 다른 제품에 쓰지 않기)</li>
+          </ul>
+        </Box>
+
+        <p className="text-xs text-gray-400">상세 플레이북: 프로젝트 문서 "소재-확장-파이프라인-플레이북" · 저장소 creative-pipeline/README.md</p>
+      </div>
+    </div>
+  );
+}
+
 function CriteriaModal({ bk, onClose }) {
   const Row = ({ c }) => (
     <tr className="border-t border-gray-100">
@@ -377,6 +440,7 @@ export default function DecisionBoard({ brand }) {
   const [q, setQ] = useState('');
   const [useCustom, setUseCustom] = useState(false);
   const [showCriteria, setShowCriteria] = useState(false);
+  const [showGuide, setShowGuide] = useState(false);
   const [customStart, setCustomStart] = useState('');
   const [customEnd, setCustomEnd] = useState('');
   const customEndRef = useRef(null);
@@ -488,6 +552,7 @@ export default function DecisionBoard({ brand }) {
       </Head>
 
       {showCriteria && <CriteriaModal bk={bk} onClose={() => setShowCriteria(false)}/>}
+      {showGuide && <GuideModal onClose={() => setShowGuide(false)}/>}
 
       <header className="bg-white border-b border-gray-200 sticky top-0 z-20 shadow-sm">
         <div className="max-w-screen-xl mx-auto px-6 py-4 flex items-center justify-between flex-wrap gap-3">
@@ -555,6 +620,10 @@ export default function DecisionBoard({ brand }) {
                 <button onClick={() => setShowCriteria(true)}
                   className="px-3 py-1.5 rounded-lg bg-gray-900 text-white text-xs font-bold hover:bg-gray-700">
                   📋 판정 기준표
+                </button>
+                <button onClick={() => setShowGuide(true)}
+                  className="px-3 py-1.5 rounded-lg bg-amber-500 text-white text-xs font-bold hover:bg-amber-600">
+                  📖 확장 가이드
                 </button>
               </p>
             )}
@@ -682,6 +751,10 @@ export default function DecisionBoard({ brand }) {
                 '오래 돌아도 효율이 안 꺾이는 검증된 승자 — 이 구조를 복제해 다른 제품으로 확장할 후보예요',
               ]}/>
               <p className="text-sm text-gray-400">브리프 복사 → Claude 채팅에 붙여넣으면 같은 구조의 신규 소재를 만들어줘요</p>
+              <button onClick={() => setShowGuide(true)}
+                className="ml-auto px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-sm font-bold shadow-sm">
+                📖 확장 가이드
+              </button>
             </div>
             <div className="space-y-3">
               {items.filter(i => i.winner).filter(matchQ).map(item => (
