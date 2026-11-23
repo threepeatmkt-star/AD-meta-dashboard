@@ -65,3 +65,19 @@
 새 소재 집행 후 광고 진단에서:
 - ⚠ 노출 못 받음(세트 점유율 <10%) → 단독 세트 분리 검토
 - 분리 후에도 손익분기 미달 → OFF 검토
+
+## 🎬 체험단 실촬영 편집 영상 (2026-11-23 샘플 확정)
+
+실행 환경: **힉스필드 샌드박스** (네이버 접속 가능 — Claude 컨테이너는 불가). 스크립트: `review-video/`
+
+1. `crawl.py` — 네이버 블로그 검색(제품명 키워드 3종 × 2페이지) → 모바일 글 열어 영상(vid/inkey)·GIF 추출
+   - **체험단 필터**: 본문에 `제공받|원고료|체험단|협찬|소정의` 있는 글만 사용 (내돈내산·일반 후기 제외)
+   - 영상은 `apis.naver.com/rmcnmv/rmcnmv/vod/play/v2.0/{vid}?key={inkey}` → 최고화질 mp4
+   - 출처용 블로그명: `m.blog.naver.com/{blogId}` 의 `<title>` (예: "책 읽는 하루")
+2. 컷 선정: 1초 간격 콘택트시트로 확인 → 4컷 × 3.5~4초 = 15초 (세팅 → 개봉 → 따르기/사용 → 제품 단독+오퍼)
+3. `ov.js` — Playwright로 투명 PNG 자막 오버레이 생성 (상단 2줄, 키워드 컬러 하이라이트, 우하단 출처, 마지막 컷 원형 오퍼 뱃지)
+4. ffmpeg로 컷별 overlay → concat → 무음 트랙(음악은 메타에서) → 1080×1920 15초
+
+- 폰트: 샌드박스는 드라이브 접근 불가 → Paperlogy는 공개 CDN(`cdn.jsdelivr.net/gh/projectnoonnu/2408-3@1.0/Paperlogy-9Black.woff2`)에서 받음. A2Z는 공개 CDN 없음 → 영상 자막은 Paperlogy 사용
+- 엔딩: 기본 없음. 필요 시 마지막 컷 오퍼 카드 or 로고플레이 (로고: 드라이브 https://drive.google.com/drive/folders/1pjVbsHbwLCc1bYELzR5hxRroMlz7OTwx)
+- 결과물 전달: 샌드박스에서 media_upload → PUT → media_confirm → 힉스필드 미디어함
