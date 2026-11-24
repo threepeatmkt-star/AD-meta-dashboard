@@ -109,7 +109,7 @@ async function getGA4Rows(cfg, startDate, endDate, ga4Token) {
     {
       dateRanges: [{ startDate, endDate }],
       dimensions: [{ name: 'sessionCampaignName' }, { name: 'sessionManualAdContent' }],
-      metrics: [{ name: 'purchaseRevenue' }],
+      metrics: [{ name: 'purchaseRevenue' }, { name: 'sessions' }],
       limit: 5000,
     },
     { headers: { Authorization: `Bearer ${ga4Token}` }, timeout: 30000 }
@@ -120,6 +120,7 @@ async function getGA4Rows(cfg, startDate, endDate, ga4Token) {
       campaign: r.dimensionValues[0].value,
       ad: r.dimensionValues[1].value,
       revenue: parseFloat(r.metricValues[0].value) || 0,
+      sessions: parseInt(r.metricValues[1]?.value) || 0,
     }));
 }
 
@@ -211,17 +212,27 @@ export default async function handler(req, res) {
       } else if (!/utm_medium=cpm/i.test(tagStr)) {
         errors.push({ k: 'utmNonStd', label: 'UTM 비표준', detail: 'UTM은 있는데 utm_medium이 cpm이 아니에요 — DA 매출 집계 기준(cpm)과 어긋나 분류가 흔들릴 수 있어요' });
       }
+      // GA4에 이 소재로 들어온 세션 수 (이름 매칭 + 광고ID 매칭) — 유입이 잡히면 추적은 정상
+      const ga4Sessions = ga4Full
+        .filter(g => (g.campaign === ad.campaignName && g.ad === ad.adName) || (g.ad === ad.adName && g.ad !== '(not set)') || g.ad === ad.adId)
+        .reduce((s, g) => s + (g.sessions || 0), 0);
+      const flagsPre = [];
       if (ad.spend >= MIN_SPEND && revenue === 0 && ad.pixelRevenue > 0) {
-        errors.push({ k: 'ga4Zero', label: 'GA4 매출 0', detail: `픽셀엔 매출(₩${Math.round(ad.pixelRevenue).toLocaleString('ko-KR')})이 찍히는데 GA4에선 0원이에요. 아래 순서로 점검해주세요.`, steps: [
-          "광고관리자에서 이 광고의 웹사이트 URL을 복사해 새 탭에 붙여넣고 접속해요",
-          "최종 도착한 페이지의 주소창에 utm_source 같은 매개변수가 남아 있는지 확인해요 — 단축링크·기획전 리다이렉트를 거치며 사라졌다면, 광고의 최종 도착 URL에 UTM을 직접 붙여야 해요",
-          "GA4 실시간 보고서를 열어둔 상태로 위 링크로 접속했을 때 유입(세션)이 잡히는지 확인해요 — 안 잡히면 자사몰 GA4 태그 문제예요",
-          "집행 1~2일 차 소재라면 GA4 집계 지연(24~48시간)일 수 있어요 — 하루 뒤 다시 점검해요",
-        ] });
+        if (ga4Sessions >= 20) {
+          // 설정 오류 아님 — 유입은 정상, 실제 구매가 없는 상태
+          flagsPre.push({ k: 'ga4NoBuy', label: 'GA4 구매 0 (유입 정상)', detail: `GA4에 이 소재 유입 ${ga4Sessions.toLocaleString('ko-KR')}세션이 정상 집계되고 있어요 — 추적 설정 문제가 아니라 실제 구매가 없는 상태예요. 픽셀 매출 ₩${Math.round(ad.pixelRevenue).toLocaleString('ko-KR')}은 광고를 본 사람이 다른 상품을 산 것·조회 후 구매까지 잡은 과집계일 가능성이 커요. 소재 문구(쿠폰·로그인 필요 혜택 등)와 랜딩 흐름을 점검하고, 개선이 어려우면 OFF 검토` });
+        } else {
+          errors.push({ k: 'ga4Zero', label: 'GA4 매출 0', detail: `픽셀엔 매출(₩${Math.round(ad.pixelRevenue).toLocaleString('ko-KR')})이 찍히는데 GA4에선 매출도 유입(${ga4Sessions}세션)도 거의 안 잡혀요 — 추적 설정을 점검해주세요.`, steps: [
+            "광고관리자에서 이 광고의 웹사이트 URL을 복사해 새 탭에 붙여넣고 접속해요",
+            "최종 도착한 페이지의 주소창에 utm_source 같은 매개변수가 남아 있는지 확인해요 — 단축링크·기획전 리다이렉트를 거치며 사라졌다면, 광고의 최종 도착 URL에 UTM을 직접 붙여야 해요",
+            "GA4 실시간 보고서를 열어둔 상태로 위 링크로 접속했을 때 유입(세션)이 잡히는지 확인해요 — 안 잡히면 자사몰 GA4 태그 문제예요",
+            "집행 1~2일 차 소재라면 GA4 집계 지연(24~48시간)일 수 있어요 — 하루 뒤 다시 점검해요",
+          ] });
+        }
       }
 
       // ── 분류 ──
-      const flags = [];
+      const flags = [...flagsPre];
       const perfWeak = r < breakeven * 1.2 || (roasA != null && roasB != null && roasA > 0 && roasB < roasA * 0.7);
       if (ad.frequency >= 3.5 && perfWeak) flags.push({ k: 'fatigue', label: '피로 주의', detail: `빈도 ${ad.frequency.toFixed(1)} — 같은 사람에게 반복 노출되는 중인데 성과도 약해지고 있어요. 새 소재 교체 준비 추천 (빈도가 높아도 성과가 유지되는 소재엔 띄우지 않아요)` });
 
@@ -291,7 +302,7 @@ export default async function handler(req, res) {
         spend: Math.round(ad.spend), revenue: Math.round(revenue), roas: r, clicks: ad.clicks,
         impressions: ad.impressions, reach: ad.reach,
         ctr: ad.impressions > 0 ? Math.round((ad.clicks / ad.impressions) * 10000) / 100 : 0,
-        pixelRoas, frequency: Math.round(ad.frequency * 10) / 10,
+        ga4Sessions, pixelRoas, frequency: Math.round(ad.frequency * 10) / 10,
         firstHalf: roasA != null ? { range: half.a, roas: roasA, spend: Math.round(adA.spend) } : null,
         secondHalf: roasB != null ? { range: half.b, roas: roasB, spend: Math.round(adB.spend) } : null,
         category, reason, options, flags, errors,
