@@ -81,3 +81,19 @@
 - 폰트: 샌드박스는 드라이브 접근 불가 → Paperlogy는 공개 CDN(`cdn.jsdelivr.net/gh/projectnoonnu/2408-3@1.0/Paperlogy-9Black.woff2`)에서 받음. A2Z는 공개 CDN 없음 → 영상 자막은 Paperlogy 사용
 - 엔딩: 기본 없음. 필요 시 마지막 컷 오퍼 카드 or 로고플레이 (로고: 드라이브 https://drive.google.com/drive/folders/1pjVbsHbwLCc1bYELzR5hxRroMlz7OTwx)
 - 결과물 전달: 샌드박스에서 media_upload → PUT → media_confirm → 힉스필드 미디어함
+
+## 📋 확장 브리프 모달 (2026-11-24)
+
+[📋 확장 브리프 복사] → 팝업에서 선택 후 복사
+- 🖼 이미지: 사이즈(9:16 / 4:5 / 1:1, 복수 선택)
+- 🎬 영상: 제작 방식 3종 + 사이즈
+  - 🏃 선수 PPL 영상편집 — PPL 원본(드라이브 링크) → 제품 노출·언급·홍보 구간 분석 → 컷편집·자막·출처(선수명)
+  - 🔎 영상·GIF 애셋 크롤링 — 위 체험단 플로우 (검색/제외 키워드 지정 가능)
+  - 🤖 AI 영상제작 — 제품 클로즈업 or 엔딩 전용, 제품 애셋 첨부 필수
+
+## 📁 제작물 저장
+
+- 드라이브 "광고소재_제작물 (Claude)" — https://drive.google.com/drive/folders/1MYVTj8W7GX8l_btGHHiN3F82BY9RiONo
+- 파일명: `YYMMDD_제품명_이미지|영상_번호소구` (예: 261120_바이퍼에너지그린_이미지_01가격.jpg)
+- 이미지: Claude 드라이브 커넥터로 업로드 (커넥터 한도 약 3MB → JPG 품질 92로 변환, 2000px 유지)
+- 영상: 힉스필드 샌드박스 → Apps Script 업로드 웹앱(POST, base64 본문, key 파라미터)으로 드라이브 폴더에 직접 저장
