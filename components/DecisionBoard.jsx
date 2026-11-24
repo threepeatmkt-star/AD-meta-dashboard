@@ -65,13 +65,13 @@ function InfoTip({ lines }) {
 
 const REAL_ACTIONS = { '끄기': 'pause_ad', '예산 축소': 'budget_down', '예산 증액': 'budget_up' };
 
-/* 🏆 확장 추천 카드 — 장수 고효율 승자 소재. 브리프 복사 → Claude 채팅에 붙여넣으면 유사 구조 신규 소재 제작 */
+/* 🏆 확장 추천 카드 — 장수 고효율 우수소재. 브리프 복사 → Claude 채팅에 붙여넣으면 유사 구조 신규 소재 제작 */
 const VIDEO_TYPES = [
   { k: 'ppl', icon: '🏃', name: '선수 PPL 영상편집', desc: 'PPL 원본에서 제품 노출·언급·홍보 구간을 찾아 광고용으로 컷편집',
     body: [
       '확장 제품명: ',
       '선수명 / 채널: ',
-      'PPL 원본 영상: (구글 드라이브 링크 — 영상은 채팅 첨부 용량 제한)',
+      'PPL 원본 영상: (NAS 파일명 — Z:\\10_마케팅팀\\02_후원선수 소스\\01_선수 PPL 영상 안의 폴더/파일명)',
       '소구포인트 (1~3개): ',
       '오퍼(가격/구성 — 수량 필수, 예: 24캔 22,900원): ',
       '길이: 15초',
@@ -93,7 +93,7 @@ const VIDEO_TYPES = [
     body: [
       '제작할 컷: 제품 클로즈업 / 엔딩 (택1)',
       '확장 제품명: ',
-      '제품 애셋: (누끼 PNG 또는 제품 사진 첨부)',
+      '제품 애셋: (NAS Z:\\02_디자인팀\\03_제품 안의 파일명 또는 첨부)',
       '엔딩이면 — 들어갈 로고·문구: ',
       '분위기/배경 (선택): ',
       '길이: 클로즈업 5초 / 엔딩 3~4초',
@@ -109,7 +109,7 @@ function BriefModal({ item, period, onClose }) {
   const vt = VIDEO_TYPES.find(t => t.k === type);
   const head = [
     `[${item.isVideo ? '영상' : '이미지'} 소재 확장 브리프${vt ? ` — ${vt.name}` : ''}]`,
-    `승자 소재: ${item.adName} (${item.isVideo ? '영상' : '이미지'})`,
+    `우수소재: ${item.adName} (${item.isVideo ? '영상' : '이미지'})`,
     `위치: ${item.campaignName} › ${item.adsetName}`,
     `성과(${period.start}~${period.end}): 광고비 ${krw(item.spend)} · GA4 매출 ${krw(item.revenue)} · ROAS ${item.roas}% · 운영 ${item.ageDays}일째`,
     item.thumbnail ? `썸네일: ${item.thumbnail}` : null,
@@ -119,7 +119,7 @@ function BriefModal({ item, period, onClose }) {
     '확장 제품명: ',
     '소구포인트 (1~3개): ',
     '오퍼(가격/구성 — 수량 꼭 기재, 예: 24캔): ',
-    '제품 누끼 PNG: (첨부)',
+    '제품 누끼 PNG: (NAS Z:\\02_디자인팀\\03_제품 안의 파일명 또는 첨부)',
     '변형 수: 3종',
   ];
   const sizeLine = type === 'ai' ? `사이즈: ${sizes.join(', ')}` : `사이즈: ${sizes.join(', ')} (선택한 사이즈 전부 제작)`;
@@ -400,7 +400,7 @@ function GuideModal({ onClose }) {
           <button onClick={onClose} className="w-9 h-9 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-500 font-bold">✕</button>
         </div>
 
-        <Box title="🖼 이미지 소재 — 승자 구조 복제">
+        <Box title="🖼 이미지 소재 — 우수소재 구조 복제">
           <ol className="space-y-2.5">
             <Step n="1">기간을 <b>최근 30일</b>로 두고 🏆 확장 추천에서 <b>🖼 이미지</b> 소재 선택 (짧은 기간은 반짝 소재가 섞임)</Step>
             <Step n="2"><b>[📋 확장 브리프 복사]</b> 클릭</Step>
@@ -414,10 +414,10 @@ function GuideModal({ onClose }) {
         <Box title="🎬 영상 소재 — 브리프 복사 시 제작 방식 3종 중 선택">
           <ol className="space-y-2.5 mb-4">
             <Step n="1">🏆 확장 추천에서 <b>🎬 영상</b> 소재의 <b>[📋 확장 브리프 복사]</b> 클릭 → 팝업에서 제작 방식 + 사이즈 선택</Step>
-            <Step n="2">Claude 채팅에 붙여넣고 빈칸 작성 → 사이즈별로 제작해서 구글 드라이브 "광고소재_제작물 (Claude)" 폴더에 저장</Step>
+            <Step n="2">Claude 채팅에 붙여넣고 빈칸 작성 → 사이즈별로 제작해서 NAS <b>{'Z:\\10_마케팅팀\\03_광고\\01_META'}</b> 에 날짜_SNS_제품명 폴더로 저장</Step>
           </ol>
           <ul className="text-[15px] text-gray-700 leading-relaxed space-y-1.5 pl-1">
-            <li>• <b>🏃 선수 PPL 영상편집</b> (메인) — PPL 원본을 드라이브 링크로 전달 → 제품 노출·언급·홍보 구간을 찾아 광고용 컷편집 + 자막</li>
+            <li>• <b>🏃 선수 PPL 영상편집</b> (메인) — PPL 원본의 NAS 파일명만 적으면 → 제품 노출·언급·홍보 구간을 찾아 광고용 컷편집 + 자막</li>
             <li>• <b>🔎 영상·GIF 애셋 크롤링</b> (메인) — Claude가 네이버 체험단 글만 수집 → 4컷 편집 + 자막 + 오퍼 뱃지. <b>출처 표기 필수</b> ("출처: 네이버 블로그 ○○")</li>
             <li>• <b>🤖 AI 영상제작</b> (서브) — 제품 클로즈업 컷 · 엔딩 전용. 제품 애셋 첨부 필수. <b>완전 신규 광고 생성 X</b> (AI티 남)</li>
             <li>• 직접 촬영본은 🏃 선수 PPL 유형으로 요청 (원본 링크만 바꿔서)</li>
@@ -485,7 +485,7 @@ function CriteriaModal({ bk, onClose }) {
             ['⚠ 노출 못 받음', '세트에 소재 2개↑ + 세트 노출 3천↑인데 점유율 10% 미만', '메타가 다른 소재에 몰아줌 — 성과 숫자로 판단 금지'],
             ['⚠ 클릭률 낮음', '노출 3천↑ AND CTR 0.5% 미만', '시선을 못 잡는 소재 — 썸네일·첫 3초 점검'],
             ['⚠ 전환 퍼널 의심', '클릭 50↑ AND GA4·픽셀 구매 모두 0', '소재는 제 역할 — 상세페이지·가격·로딩 문제'],
-            ['⚠ GA4 구매 0 (유입 정상)', '광고비 3만원↑ + GA4 유입 20세션↑인데 GA4 매출 0, 픽셀엔 매출 있음', '추적은 정상 — 실제 구매가 없음. 픽셀은 과집계. 소재 문구·랜딩 흐름 점검 or OFF'],
+            ['⚠ GA4 구매 0 (유입 정상)', '광고비 3만원↑ + GA4 유입 5세션↑인데 GA4 매출 0, 픽셀엔 매출 있음', '추적은 정상 — 실제 구매가 없음. 픽셀은 과집계. 소재 문구·랜딩 흐름 점검 or OFF'],
           ]}/>
 
         <Table title="③ 설정 오류(🚨) — 숫자가 새는 원인"
@@ -493,11 +493,11 @@ function CriteriaModal({ bk, onClose }) {
           rows={[
             ['🚨 UTM 없음', '랜딩 URL·URL 매개변수 어디에도 utm이 없음'],
             ['🚨 UTM 비표준', 'utm_medium이 cpm이 아님'],
-            ['🚨 GA4 매출 0', '픽셀엔 매출 있는데 GA4엔 매출도 유입(20세션 미만)도 거의 없음 — 추적이 새는 중'],
+            ['🚨 GA4 매출 0', '픽셀엔 매출 있는데 GA4엔 매출도 유입(5세션 미만)도 거의 없음 — 추적이 새는 중'],
             ['🚨 UTM 확인 불가', '파트너십 광고라 URL을 API로 못 읽고 GA4 유입도 없음'],
           ]}/>
 
-        <Table title="④ 확장 추천(🏆) — 분류와 별개, 복제할 승자 소재 표시"
+        <Table title="④ 확장 추천(🏆) — 분류와 별개, 복제할 우수소재 표시"
           head={['표시', '조건', '의미']}
           rows={[
             ['🏆 확장 추천', `운영 30일↑ + 기간 광고비 5만원↑ + ROAS ${bk * 2}%↑ + 후반에도 손익분기 유지`, '장수인데 효율이 안 꺾이는 검증된 소재 — 브리프 복사 → Claude 채팅에 붙여넣으면 같은 구조로 다른 제품 소재를 확장 제작'],
@@ -620,7 +620,7 @@ export default function DecisionBoard({ brand }) {
   const ERROR_RULES = [
     'UTM 없음: 랜딩 URL·URL 매개변수 어디에도 utm이 없음 — 인스타 일부 경로는 자동 태그(ig/paid)로 구제되지만, 페북 지면·외부 브라우저 클릭은 유입 미상으로 새요',
     'UTM 비표준: utm_medium이 cpm이 아님',
-    'GA4 매출 0: 픽셀엔 매출이 찍히는데 GA4엔 매출도 유입(20세션 미만)도 거의 없음 — 추적이 새는 중 (광고비 3만원 이상만). 유입이 정상인데 구매만 0이면 오류가 아니라 ⚠ GA4 구매 0 (유입 정상)으로 표시',
+    'GA4 매출 0: 픽셀엔 매출이 찍히는데 GA4엔 매출도 유입(5세션 미만)도 거의 없음 — 추적이 새는 중 (광고비 3만원 이상만). 유입이 정상인데 구매만 0이면 오류가 아니라 ⚠ GA4 구매 0 (유입 정상)으로 표시',
     'UTM 확인 불가: 파트너십 광고 등 URL을 API로 못 읽고, GA4 유입도 없음',
   ];
 
@@ -822,7 +822,7 @@ export default function DecisionBoard({ brand }) {
           </section>
         )}
 
-        {/* 🏆 확장 추천 (승자 소재) — 설정 오류 다음, OFF 검토 앞 */}
+        {/* 🏆 확장 추천 (우수소재) — 설정 오류 다음, OFF 검토 앞 */}
         {items.filter(i => i.winner).filter(matchQ).length > 0 && data && (
           <section id="sec-winners" className="mb-8 scroll-mt-32">
             <div className="flex items-center gap-2 mb-3">
@@ -830,7 +830,7 @@ export default function DecisionBoard({ brand }) {
               <InfoTip lines={[
                 '기준: 운영 30일 이상 + 기간 광고비 5만원 이상',
                 `+ ROAS 손익분기(${bk}%)의 2배 이상 + 기간 후반에도 손익분기 유지`,
-                '오래 돌아도 효율이 안 꺾이는 검증된 승자 — 이 구조를 복제해 다른 제품으로 확장할 후보예요',
+                '오래 돌아도 효율이 안 꺾이는 검증된 우수소재 — 이 구조를 복제해 다른 제품으로 확장할 후보예요',
               ]}/>
               <p className="text-sm text-gray-400">브리프 복사 → Claude 채팅에 붙여넣으면 같은 구조의 신규 소재를 만들어줘요</p>
               <button onClick={() => setShowGuide(true)}

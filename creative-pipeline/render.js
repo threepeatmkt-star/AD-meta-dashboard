@@ -1,6 +1,6 @@
 /**
  * 바이퍼 에너지 그린 — 1:1 소재 3종 렌더러
- * 승자(image_a_1p1) 구조 DNA: 상단 뱃지 → 초대형 후킹 텍스트(흰 테두리) → 보조라인
+ * 우수소재(image_a_1p1) 구조 DNA: 상단 뱃지 → 초대형 후킹 텍스트(흰 테두리) → 보조라인
  *   → 제품 대형 배치 → 우하단 원형 뱃지 → 하단 오퍼바
  * 출력: 2000×2000 PNG (viewport 1000 @2x)
  */
@@ -147,7 +147,7 @@ const BASE_CSS = `
   .strike::after{content:'';position:absolute;left:-4%;right:-4%;top:52%;height:6px;background:#FF3B30;transform:rotate(-6deg);border-radius:3px;}
 `;
 
-// ───────── V1 가격파괴형 (승자 공식 직이식) ─────────
+// ───────── V1 가격파괴형 (우수소재 공식 직이식) ─────────
 const V1 = (bg) => `<!doctype html><html><head><meta charset="utf-8"><style>${BASE_CSS}
   body{${bg}}
 </style></head><body>

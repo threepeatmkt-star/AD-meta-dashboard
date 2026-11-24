@@ -192,12 +192,13 @@ export default async function handler(req, res) {
       // ── 설정 오류 점검 ──
       const tagStr = (adMeta.tags || '').trim();
       // UTM이 실제로 작동하는지의 가장 확실한 증거: GA4에 이 광고 '이름'으로 매출/유입이 잡히는가
-      const nameMatchedRev = matchRows(ga4Full, ad, utm).filter(g => g.ad !== ad.adId).reduce((s, g) => s + g.revenue, 0);
+      // UTM 작동 증거 = GA4에 이 소재 이름(또는 링크의 utm_content)으로 유입이 잡히는가 (매출이 아니라 세션 기준)
+      const nameMatchedSessions = matchRows(ga4Full, ad, utm).filter(g => g.ad !== ad.adId).reduce((s, g) => s + (g.sessions || 0), 0);
       const errors = [];
       if (!tagStr) {
         // 파트너십(크리에이터 계정) 광고 등은 메타 API가 URL 필드를 안 보여줌 → GA4 유입으로 교차 검증
-        if (nameMatchedRev === 0 && ad.spend >= MIN_SPEND) {
-          errors.push({ k: 'utmUnknown', label: 'UTM 확인 불가', detail: '파트너십 광고 등은 URL을 API로 읽을 수 없어요. 이 기간 GA4에 이 소재 이름의 UTM 유입 매출도 안 잡혀서, 광고관리자에서 웹사이트 URL에 UTM이 붙어있는지 직접 확인해주세요 (UTM이 있어도 구매가 없었던 것뿐일 수 있어요)' });
+        if (nameMatchedSessions < 5 && ad.spend >= MIN_SPEND) {
+          errors.push({ k: 'utmUnknown', label: 'UTM 확인 불가', detail: '파트너십 광고 등은 URL을 API로 읽을 수 없어요. 이 기간 GA4에 이 소재 이름의 UTM 유입도 거의 없어서, 광고관리자에서 웹사이트 URL에 UTM이 붙어있는지 직접 확인해주세요 (UTM이 있어도 구매가 없었던 것뿐일 수 있어요)' });
         }
         // GA4에 이름으로 매출이 잡히면 UTM 정상 작동 → 오류 아님
       } else if (!/utm_/i.test(tagStr)) {
@@ -209,11 +210,11 @@ export default async function handler(req, res) {
       const ga4Sessions = matchRows(ga4Full, ad, utm).reduce((s, g) => s + (g.sessions || 0), 0);
       const flagsPre = [];
       if (ad.spend >= MIN_SPEND && revenue === 0 && ad.pixelRevenue > 0) {
-        if (ga4Sessions >= 20) {
+        if (ga4Sessions >= 5) {
           // 설정 오류 아님 — 유입은 정상, 실제 구매가 없는 상태
           flagsPre.push({ k: 'ga4NoBuy', label: 'GA4 구매 0 (유입 정상)', detail: `GA4에 이 소재 유입 ${ga4Sessions.toLocaleString('ko-KR')}세션이 정상 집계되고 있어요 — 추적 설정 문제가 아니라 실제 구매가 없는 상태예요. 픽셀 매출 ₩${Math.round(ad.pixelRevenue).toLocaleString('ko-KR')}은 광고를 본 사람이 다른 상품을 산 것·조회 후 구매까지 잡은 과집계일 가능성이 커요. 소재 문구(쿠폰·로그인 필요 혜택 등)와 랜딩 흐름을 점검하고, 개선이 어려우면 OFF 검토` });
         } else {
-          errors.push({ k: 'ga4Zero', label: 'GA4 매출 0', detail: `픽셀엔 매출(₩${Math.round(ad.pixelRevenue).toLocaleString('ko-KR')})이 찍히는데 GA4에선 매출도 유입(${ga4Sessions}세션)도 거의 안 잡혀요 — 추적 설정을 점검해주세요.`, steps: [
+          errors.push({ k: 'ga4Zero', label: 'GA4 매출 0', detail: `픽셀엔 매출(₩${Math.round(ad.pixelRevenue).toLocaleString('ko-KR')})이 찍히는데 GA4에선 매출도 유입도 ${ga4Sessions}세션뿐이에요 — 추적 설정을 점검해주세요.`, steps: [
             "광고관리자에서 이 광고의 웹사이트 URL을 복사해 새 탭에 붙여넣고 접속해요",
             "최종 도착한 페이지의 주소창에 utm_source 같은 매개변수가 남아 있는지 확인해요 — 단축링크·기획전 리다이렉트를 거치며 사라졌다면, 광고의 최종 도착 URL에 UTM을 직접 붙여야 해요",
             "GA4 실시간 보고서를 열어둔 상태로 위 링크로 접속했을 때 유입(세션)이 잡히는지 확인해요 — 안 잡히면 자사몰 GA4 태그 문제예요",
@@ -272,7 +273,7 @@ export default async function handler(req, res) {
         options = ['유지', '예산 증액', '보류'];
       }
 
-      // ── 🏆 확장 추천 (승자 소재) 판정 ──
+      // ── 🏆 확장 추천 (우수소재) 판정 ──
       // 기준: 운영 30일 이상 + 기간 광고비 5만원 이상 + ROAS 손익분기 2배 이상 + 후반에도 손익분기 유지
       const ageDays = adMeta.createdTime
         ? Math.floor((Date.now() - new Date(adMeta.createdTime).getTime()) / 86400000)
