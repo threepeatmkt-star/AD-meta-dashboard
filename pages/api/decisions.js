@@ -8,6 +8,7 @@
  * - 참고: 메타 픽셀 ROAS, 빈도(피로도)
  */
 import axios from 'axios';
+import { parseUtm, matchRows, matchRevenue } from '../../lib/ga4Match';
 import { resolveBrand } from '../../lib/brandEnv';
 import { BRANDS } from '../../lib/brands';
 
@@ -124,13 +125,6 @@ async function getGA4Rows(cfg, startDate, endDate, ga4Token) {
     }));
 }
 
-function matchRevenue(ga4Rows, ad) {
-  const byName = ga4Rows.filter(g => g.campaign === ad.campaignName && g.ad === ad.adName).reduce((s, g) => s + g.revenue, 0);
-  const fallback = byName === 0 ? ga4Rows.filter(g => g.ad === ad.adName && g.ad !== '(not set)').reduce((s, g) => s + g.revenue, 0) : 0;
-  const byId = ga4Rows.filter(g => g.ad === ad.adId).reduce((s, g) => s + g.revenue, 0); // 메타 자동 UTM(ig/paid)
-  return (byName || fallback) + byId;
-}
-
 const roas = (rev, spend) => (spend > 0 ? Math.round((rev / spend) * 1000) / 10 : 0);
 
 function splitRange(startDate, endDate) {
@@ -183,23 +177,22 @@ export default async function handler(req, res) {
     });
 
     const items = adsFull.map(ad => {
-      const revenue = matchRevenue(ga4Full, ad);
+      const adMeta = adTags[ad.adId] || {};
+      const utm = parseUtm(adMeta.tags);
+      const revenue = matchRevenue(ga4Full, ad, utm);
       const r = roas(revenue, ad.spend);
       const pixelRoas = roas(ad.pixelRevenue, ad.spend);
 
       const adA = aById[ad.adId], adB = bById[ad.adId];
-      const revA = adA ? matchRevenue(ga4A, { ...ad, ...adA }) : 0;
-      const revB = adB ? matchRevenue(ga4B, { ...ad, ...adB }) : 0;
+      const revA = adA ? matchRevenue(ga4A, { ...ad, ...adA }, utm) : 0;
+      const revB = adB ? matchRevenue(ga4B, { ...ad, ...adB }, utm) : 0;
       const roasA = adA ? roas(revA, adA.spend) : null;
       const roasB = adB ? roas(revB, adB.spend) : null;
 
       // ── 설정 오류 점검 ──
-      const adMeta = adTags[ad.adId] || {};
       const tagStr = (adMeta.tags || '').trim();
       // UTM이 실제로 작동하는지의 가장 확실한 증거: GA4에 이 광고 '이름'으로 매출/유입이 잡히는가
-      const nameMatchedRev = ga4Full
-        .filter(g => (g.campaign === ad.campaignName && g.ad === ad.adName) || (g.ad === ad.adName && g.ad !== '(not set)'))
-        .reduce((s, g) => s + g.revenue, 0);
+      const nameMatchedRev = matchRows(ga4Full, ad, utm).filter(g => g.ad !== ad.adId).reduce((s, g) => s + g.revenue, 0);
       const errors = [];
       if (!tagStr) {
         // 파트너십(크리에이터 계정) 광고 등은 메타 API가 URL 필드를 안 보여줌 → GA4 유입으로 교차 검증
@@ -213,9 +206,7 @@ export default async function handler(req, res) {
         errors.push({ k: 'utmNonStd', label: 'UTM 비표준', detail: 'UTM은 있는데 utm_medium이 cpm이 아니에요 — DA 매출 집계 기준(cpm)과 어긋나 분류가 흔들릴 수 있어요' });
       }
       // GA4에 이 소재로 들어온 세션 수 (이름 매칭 + 광고ID 매칭) — 유입이 잡히면 추적은 정상
-      const ga4Sessions = ga4Full
-        .filter(g => (g.campaign === ad.campaignName && g.ad === ad.adName) || (g.ad === ad.adName && g.ad !== '(not set)') || g.ad === ad.adId)
-        .reduce((s, g) => s + (g.sessions || 0), 0);
+      const ga4Sessions = matchRows(ga4Full, ad, utm).reduce((s, g) => s + (g.sessions || 0), 0);
       const flagsPre = [];
       if (ad.spend >= MIN_SPEND && revenue === 0 && ad.pixelRevenue > 0) {
         if (ga4Sessions >= 20) {
@@ -302,7 +293,7 @@ export default async function handler(req, res) {
         spend: Math.round(ad.spend), revenue: Math.round(revenue), roas: r, clicks: ad.clicks,
         impressions: ad.impressions, reach: ad.reach,
         ctr: ad.impressions > 0 ? Math.round((ad.clicks / ad.impressions) * 10000) / 100 : 0,
-        ga4Sessions, pixelRoas, frequency: Math.round(ad.frequency * 10) / 10,
+        ga4Sessions, utmContent: utm.content, pixelRoas, frequency: Math.round(ad.frequency * 10) / 10,
         firstHalf: roasA != null ? { range: half.a, roas: roasA, spend: Math.round(adA.spend) } : null,
         secondHalf: roasB != null ? { range: half.b, roas: roasB, spend: Math.round(adB.spend) } : null,
         category, reason, options, flags, errors,

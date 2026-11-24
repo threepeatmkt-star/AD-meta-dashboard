@@ -4,6 +4,7 @@
  */
 import axios from 'axios';
 import { resolveBrand, SNS_REGEX } from '../../lib/brandEnv';
+import { parseUtm, matchRevenue, getAdLinkTags } from '../../lib/ga4Match';
 
 const META_BASE = 'https://graph.facebook.com/v20.0';
 
@@ -239,12 +240,12 @@ export default async function handler(req, res) {
       level === 'adset' ? getAdsetBudgets(cfg) : Promise.resolve({}),
     ]);
 
+    const linkTags = await getAdLinkTags(adInsights.map(a => a.ad_id), cfg.metaToken);
     const adWithRevenue = adInsights.map(ad => {
-      const revenue = ga4Data.filter(g => g.campaign === ad.campaign_name && g.ad === ad.ad_name).reduce((s,g)=>s+g.revenue,0);
-      const fallback = revenue === 0 ? ga4Data.filter(g => g.ad === ad.ad_name && g.ad !== '(not set)').reduce((s,g)=>s+g.revenue,0) : 0;
-      // 메타 자동 UTM(ig/paid)은 utm_content에 광고 숫자 ID가 찍힘 → 광고 ID로 추가 매핑
-      const idRevenue = ga4Data.filter(g => g.ad === ad.ad_id).reduce((s,g)=>s+g.revenue,0);
-      return { ...ad, revenue: (revenue || fallback) + idRevenue };
+      const revenue = matchRevenue(ga4Data,
+        { campaignName: ad.campaign_name, adName: ad.ad_name, adId: ad.ad_id },
+        parseUtm(linkTags[ad.ad_id]));
+      return { ...ad, revenue };
     });
 
     if (level === 'ad') {
