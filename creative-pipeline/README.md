@@ -97,3 +97,4 @@
 - 파일명: `YYMMDD_제품명_이미지|영상_번호소구` (예: 261120_바이퍼에너지그린_이미지_01가격.jpg)
 - 이미지: Claude 드라이브 커넥터로 업로드 (커넥터 한도 약 3MB → JPG 품질 92로 변환, 2000px 유지)
 - 영상: 힉스필드 샌드박스 → Apps Script 업로드 웹앱(POST, base64 본문, key 파라미터)으로 드라이브 폴더에 직접 저장
+- 업로드 웹앱 호출: `curl -sL -H 'Content-Type: text/plain' --data-binary @b64.txt "$URL?key=..&n=<파일명 base64url>&type=video/mp4"` (⚠ `-X POST` 쓰면 리다이렉트에서 깨짐 · 한글 파일명은 n=base64url로)
