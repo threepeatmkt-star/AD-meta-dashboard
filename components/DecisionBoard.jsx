@@ -66,32 +66,65 @@ function InfoTip({ lines }) {
 const REAL_ACTIONS = { '끄기': 'pause_ad', '예산 축소': 'budget_down', '예산 증액': 'budget_up' };
 
 /* 🏆 확장 추천 카드 — 장수 고효율 승자 소재. 브리프 복사 → Claude 채팅에 붙여넣으면 유사 구조 신규 소재 제작 */
-function WinnerCard({ item, period, adAccountId }) {
+const VIDEO_TYPES = [
+  { k: 'ppl', icon: '🏃', name: '선수 PPL 영상편집', desc: 'PPL 원본에서 제품 노출·언급·홍보 구간을 찾아 광고용으로 컷편집',
+    body: [
+      '확장 제품명: ',
+      '선수명 / 채널: ',
+      'PPL 원본 영상: (구글 드라이브 링크 — 영상은 채팅 첨부 용량 제한)',
+      '소구포인트 (1~3개): ',
+      '오퍼(가격/구성 — 수량 필수, 예: 24캔 22,900원): ',
+      '길이: 15초',
+      '엔딩: 없음 / 오퍼 카드 / 로고플레이 (택1)',
+      '→ Claude: 제품 노출·언급 구간 + 홍보 구간 분석 → 컷편집 · 자막 · 출처(선수명) · 사이즈별 제작',
+    ] },
+  { k: 'crawl', icon: '🔎', name: '영상·GIF 애셋 크롤링', desc: 'Claude가 네이버 체험단 글의 영상·GIF를 수집해 컷편집 (출처 표기)',
+    body: [
+      '확장 제품명: ',
+      '검색 키워드 (선택 — 비우면 제품명으로 검색): ',
+      '제외 키워드 (선택 — 다른 맛·옵션 섞임 방지, 예: 레드): ',
+      '소구포인트 (1~3개): ',
+      '오퍼(가격/구성 — 수량 필수): ',
+      '길이: 15초',
+      '엔딩: 없음 / 오퍼 카드 / 로고플레이 (택1)',
+      '→ Claude: 체험단 글만 수집(출처=블로그명) → 4컷 × 3~4초 편집 · 자막 · 사이즈별 제작',
+    ] },
+  { k: 'ai', icon: '🤖', name: 'AI 영상제작', desc: '제품 클로즈업 컷 또는 엔딩 전용 (완전 신규 광고 생성 X)',
+    body: [
+      '제작할 컷: 제품 클로즈업 / 엔딩 (택1)',
+      '확장 제품명: ',
+      '제품 애셋: (누끼 PNG 또는 제품 사진 첨부)',
+      '엔딩이면 — 들어갈 로고·문구: ',
+      '분위기/배경 (선택): ',
+      '길이: 클로즈업 5초 / 엔딩 3~4초',
+      '→ Claude: 힉스필드로 생성 (크레딧 사용 — 생성 전 예상 크레딧 먼저 안내)',
+    ] },
+];
+const SIZES = ['9:16', '4:5', '1:1'];
+
+function BriefModal({ item, period, onClose }) {
+  const [type, setType] = useState(item.isVideo ? 'ppl' : 'image');
+  const [sizes, setSizes] = useState(item.isVideo ? ['9:16'] : ['1:1']);
   const [copied, setCopied] = useState(false);
+  const vt = VIDEO_TYPES.find(t => t.k === type);
   const head = [
-    item.isVideo ? '[영상 소재 확장 브리프]' : '[이미지 소재 확장 브리프]',
+    `[${item.isVideo ? '영상' : '이미지'} 소재 확장 브리프${vt ? ` — ${vt.name}` : ''}]`,
     `승자 소재: ${item.adName} (${item.isVideo ? '영상' : '이미지'})`,
     `위치: ${item.campaignName} › ${item.adsetName}`,
     `성과(${period.start}~${period.end}): 광고비 ${krw(item.spend)} · GA4 매출 ${krw(item.revenue)} · ROAS ${item.roas}% · 운영 ${item.ageDays}일째`,
     item.thumbnail ? `썸네일: ${item.thumbnail}` : null,
     '---',
   ];
-  const body = item.isVideo ? [
-    '확장 제품명: ',
-    '소구포인트 (1~3개): ',
-    '오퍼(가격/구성): ',
-    '촬영 소스: (체험단·선수 실촬영본 첨부 / 없으면 "없음")',
-    '원본 승자 영상 파일: (광고관리자에서 받아 첨부 — 구조 분석용)',
-    '길이: 15초 / 비율: 9:16 (릴스·스토리)',
-    '엔딩: 블랙 전환 + 브랜드 로고',
-  ] : [
+  const body = vt ? vt.body : [
     '확장 제품명: ',
     '소구포인트 (1~3개): ',
     '오퍼(가격/구성 — 수량 꼭 기재, 예: 24캔): ',
     '제품 누끼 PNG: (첨부)',
-    '비율: 1:1 / 변형 수: 3종',
+    '변형 수: 3종',
   ];
-  const brief = [...head, ...body].filter(Boolean).join('\n');
+  const sizeLine = type === 'ai' ? `사이즈: ${sizes.join(', ')}` : `사이즈: ${sizes.join(', ')} (선택한 사이즈 전부 제작)`;
+  const brief = [...head, ...body.slice(0, -1), sizeLine, body[body.length - 1]].filter(Boolean).join('\n');
+  const toggle = s => setSizes(p => p.includes(s) ? (p.length > 1 ? p.filter(x => x !== s) : p) : SIZES.filter(x => [...p, s].includes(x)));
 
   const copy = async () => {
     try { await navigator.clipboard.writeText(brief); }
@@ -100,9 +133,57 @@ function WinnerCard({ item, period, adAccountId }) {
       ta.value = brief; document.body.appendChild(ta); ta.select();
       document.execCommand('copy'); document.body.removeChild(ta);
     }
-    setCopied(true); setTimeout(() => setCopied(false), 2500);
+    setCopied(true); setTimeout(() => { setCopied(false); onClose(); }, 1200);
   };
 
+  return (
+    <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/40 p-4 overflow-y-auto" onClick={onClose}>
+      <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full my-8 p-6" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between mb-1">
+          <p className="text-xl font-extrabold text-gray-900">📋 확장 브리프 만들기</p>
+          <button onClick={onClose} className="w-9 h-9 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-500 font-bold">✕</button>
+        </div>
+        <p className="text-sm text-gray-500 mb-5">🏆 {item.adName}</p>
+
+        {item.isVideo && (
+          <>
+            <p className="text-sm font-bold text-gray-900 mb-2">① 제작 방식</p>
+            <div className="grid gap-2 mb-5">
+              {VIDEO_TYPES.map(t => (
+                <button key={t.k} onClick={() => { setType(t.k); if (t.k === 'ai') setSizes(['9:16']); }}
+                  className={`text-left rounded-xl border-2 px-4 py-3 transition-colors ${type === t.k ? 'border-amber-500 bg-amber-50' : 'border-gray-200 hover:border-gray-300'}`}>
+                  <p className="text-[15px] font-extrabold text-gray-900">{t.icon} {t.name}{t.k === 'ai' ? <span className="ml-1.5 text-xs font-bold text-gray-400">(서브)</span> : null}</p>
+                  <p className="text-sm text-gray-500 mt-0.5">{t.desc}</p>
+                </button>
+              ))}
+            </div>
+          </>
+        )}
+
+        <p className="text-sm font-bold text-gray-900 mb-2">{item.isVideo ? '②' : '①'} 사이즈 <span className="font-normal text-gray-400">(여러 개 선택 가능)</span></p>
+        <div className="flex gap-2 mb-5">
+          {SIZES.map(s => (
+            <button key={s} onClick={() => toggle(s)}
+              className={`px-4 py-2 rounded-xl text-sm font-bold border-2 ${sizes.includes(s) ? 'border-amber-500 bg-amber-500 text-white' : 'border-gray-200 text-gray-600 hover:border-gray-300'}`}>
+              {s}<span className="ml-1 text-[11px] font-semibold opacity-75">{s === '9:16' ? '릴스·스토리' : s === '4:5' ? '피드' : '피드·정사각'}</span>
+            </button>
+          ))}
+        </div>
+
+        <p className="text-sm font-bold text-gray-900 mb-2">미리보기</p>
+        <pre className="text-[13px] text-gray-700 bg-gray-50 border border-gray-100 rounded-xl p-4 whitespace-pre-wrap leading-relaxed max-h-64 overflow-y-auto">{brief}</pre>
+
+        <button onClick={copy}
+          className={`mt-4 w-full py-3 rounded-xl text-[15px] font-bold text-white ${copied ? 'bg-emerald-600' : 'bg-amber-500 hover:bg-amber-600'}`}>
+          {copied ? '✓ 복사됨! Claude 채팅에 붙여넣고 빈칸을 채워주세요' : '📋 이 브리프 복사'}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function WinnerCard({ item, period, adAccountId }) {
+  const [open, setOpen] = useState(false);
   return (
     <div className="rounded-2xl bg-white border-2 border-amber-300 px-5 py-4">
       <div className="flex items-start gap-4">
@@ -125,9 +206,9 @@ function WinnerCard({ item, period, adAccountId }) {
           <p className="text-sm text-gray-400 mt-1">광고비 {man(item.spend)} · 매출 {man(item.revenue)} · 클릭 {(item.clicks || 0).toLocaleString('ko-KR')}회 (CTR {item.ctr}%)</p>
         </div>
         <div className="shrink-0 flex flex-col gap-2">
-          <button onClick={copy}
-            className={`px-4 py-2.5 rounded-xl text-sm font-bold text-white shadow-sm transition-colors ${copied ? 'bg-emerald-600' : 'bg-amber-500 hover:bg-amber-600'}`}>
-            {copied ? '✓ 복사됨!' : '📋 확장 브리프 복사'}
+          <button onClick={() => setOpen(true)}
+            className="px-4 py-2.5 rounded-xl text-sm font-bold text-white shadow-sm bg-amber-500 hover:bg-amber-600">
+            📋 확장 브리프 복사
           </button>
           {adAccountId && (
             <a href={adsManagerUrl(adAccountId, item.adId)} target="_blank" rel="noreferrer"
@@ -137,6 +218,7 @@ function WinnerCard({ item, period, adAccountId }) {
           )}
         </div>
       </div>
+      {open && <BriefModal item={item} period={period} onClose={() => setOpen(false)}/>}
     </div>
   );
 }
@@ -329,19 +411,18 @@ function GuideModal({ onClose }) {
           </ol>
         </Box>
 
-        <Box title="🎬 영상 소재 — 실촬영본 편집이 메인">
-          <p className="text-sm font-bold text-gray-900 mb-2">① 실촬영본 + 편집 (메인)</p>
-          <ul className="text-[15px] text-gray-700 leading-relaxed space-y-1.5 mb-4 pl-1">
-            <li>• <b>후원선수 PPL 편집</b> — 릴스형. 상단 후킹 2줄 + 하단 제품·쿠폰가 카드</li>
-            <li>• <b>체험단 블로그 영상/GIF 컷편집</b> — Claude가 네이버에서 체험단 글만 수집 → 4컷 × 3~4초 + 자막 + 오퍼 뱃지. <b>출처 표기 필수</b> ("출처: 네이버 블로그 ○○")</li>
-            <li>• <b>직접 촬영본</b> — 원본 파일 첨부하면 같은 방식으로 편집</li>
-          </ul>
-          <p className="text-sm font-bold text-gray-900 mb-2">② AI 영상 (서브)</p>
+        <Box title="🎬 영상 소재 — 브리프 복사 시 제작 방식 3종 중 선택">
+          <ol className="space-y-2.5 mb-4">
+            <Step n="1">🏆 확장 추천에서 <b>🎬 영상</b> 소재의 <b>[📋 확장 브리프 복사]</b> 클릭 → 팝업에서 제작 방식 + 사이즈 선택</Step>
+            <Step n="2">Claude 채팅에 붙여넣고 빈칸 작성 → 사이즈별로 제작해서 구글 드라이브 "광고소재_제작물 (Claude)" 폴더에 저장</Step>
+          </ol>
           <ul className="text-[15px] text-gray-700 leading-relaxed space-y-1.5 pl-1">
-            <li>• 제품 클로즈업 B롤 · 엔딩 제작 전용</li>
-            <li>• 유사 제품군 템플릿이 있을 때만 제품(+배경) 교체 — <b>완전 신규 생성 금지</b> (AI티 남)</li>
+            <li>• <b>🏃 선수 PPL 영상편집</b> (메인) — PPL 원본을 드라이브 링크로 전달 → 제품 노출·언급·홍보 구간을 찾아 광고용 컷편집 + 자막</li>
+            <li>• <b>🔎 영상·GIF 애셋 크롤링</b> (메인) — Claude가 네이버 체험단 글만 수집 → 4컷 편집 + 자막 + 오퍼 뱃지. <b>출처 표기 필수</b> ("출처: 네이버 블로그 ○○")</li>
+            <li>• <b>🤖 AI 영상제작</b> (서브) — 제품 클로즈업 컷 · 엔딩 전용. 제품 애셋 첨부 필수. <b>완전 신규 광고 생성 X</b> (AI티 남)</li>
+            <li>• 직접 촬영본은 🏃 선수 PPL 유형으로 요청 (원본 링크만 바꿔서)</li>
           </ul>
-          <p className="text-sm text-gray-500 mt-3">요청 방법: 🎬 영상 소재의 확장 브리프 복사 → 채팅에 붙여넣기 → 제품명·소구포인트·오퍼 작성 (체험단 수집은 Claude가 진행)</p>
+          <p className="text-sm text-gray-500 mt-3">엔딩: 기본 없음 · 필요하면 오퍼 카드 or 로고플레이 · 바이퍼 블랙+로고 엔딩은 바이퍼 전용</p>
         </Box>
 
         <Box title="✅ 공통 규칙">
